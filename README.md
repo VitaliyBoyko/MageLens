@@ -16,11 +16,13 @@ Run `./bin/run-coverage` to generate coverage reports and badges for your projec
 
 ## Quick start
 
-Download and install MageLens into a new `magelens` directory:
+Run this inside the empty directory you want to use for MageLens:
 
 ```bash
-mkdir magelens && wget -qO- https://github.com/VitaliyBoyko/MageLens/archive/refs/heads/main.tar.gz | tar -xz --strip-components=1 -C magelens && cd magelens && ./install.sh
+wget -qO- https://github.com/VitaliyBoyko/MageLens/archive/refs/heads/main.tar.gz | tar -xz --strip-components=1 && ./install.sh
 ```
+
+If you have already cloned or downloaded MageLens, run `./install.sh` from its project directory.
 
 Then generate coverage reports:
 
