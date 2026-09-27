@@ -43,13 +43,13 @@ say 'Preparing local Magento source in src/ (preserving an existing installation
 dc run --rm --no-deps workspace
 dc run --rm --no-deps runner node bin/prepare.cjs --plain
 say 'Starting the dedicated Magento database and search services'
-dc up -d --wait --wait-timeout 180 db redis opensearch runner
+start_dependencies
 say 'Installing/configuring Magento and discovered custom modules'
 dc run --rm --no-deps --user root phpfpm bash /application/docker/php/install-magento.sh
 dc up -d --force-recreate phpfpm app
 say "Configuring $APPLICATION_DOMAIN with the upstream domain and SSL tools"
 "$ROOT/bin/setup-domain" "$APPLICATION_DOMAIN"
-dc up -d --wait --wait-timeout 180 db redis opensearch runner
+start_dependencies
 dc exec -T phpfpm bash /application/docker/php/base-url.sh
 dc exec -T phpfpm bash /application/docker/php/refresh-assets.sh
 dc exec -T runner cypress verify

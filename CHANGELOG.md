@@ -1,5 +1,12 @@
 # Release notes
 
+## 1.0.5 — 2026-09-27
+
+- The Cypress runner recovers after an interrupted container shutdown, including during installation's SSL restart.
+- Installation and coverage commands print service logs when a required container fails to start.
+
+Validated with a fresh Magento install, all five Cypress tests, all three reports, 25 integration tests, and repeated runner restarts after graceful and forced shutdowns.
+
 ## 1.0.4 — 2026-09-27
 
 - The bundled demo now selects its real storefront theme when no theme is configured. Reinstalling preserves your theme choices.

@@ -19,7 +19,7 @@ Run `./bin/run-coverage` to generate coverage reports and badges for your projec
 Run this inside the empty directory you want to use for MageLens:
 
 ```bash
-wget -qO- https://github.com/VitaliyBoyko/MageLens/archive/refs/tags/v1.0.4.tar.gz | tar -xz --strip-components=1 && ./install.sh
+wget -qO- https://github.com/VitaliyBoyko/MageLens/archive/refs/tags/v1.0.5.tar.gz | tar -xz --strip-components=1 && ./install.sh
 ```
 
 If you have already cloned or downloaded MageLens, run `./install.sh` from its project directory.
@@ -145,6 +145,7 @@ Run these from the repository root:
 ./install.sh shop.test                    # configure a different local domain
 ./bin/run-coverage                        # full suite, fresh reports, and badges
 ./bin/application-compose logs app phpfpm # inspect nginx and PHP logs
+./bin/application-compose logs runner     # inspect Cypress desktop startup
 ./bin/application-compose stop            # stop this project's services
 bin/start                                 # start the installed environment
 bin/magento cache:clean

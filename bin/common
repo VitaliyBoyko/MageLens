@@ -17,6 +17,13 @@ dc() {
 }
 say() { printf '\n==> %s\n' "$*"; }
 fail() { printf '\nError: %s\n' "$*" >&2; exit 1; }
+start_dependencies() {
+    if ! dc up -d --wait --wait-timeout 180 db redis opensearch runner; then
+        dc ps -a >&2 || true
+        dc logs --tail 80 db redis opensearch runner >&2 || true
+        fail 'A required service could not start. See its logs above, then rerun the command.'
+    fi
+}
 start_php_for_setup() {
     # Fresh named volumes belong to root. Initialize them before non-root PHP starts.
     dc run --rm --no-deps --user root phpfpm chown "$LOCAL_UID:$LOCAL_GID" /sock /var/www/.composer /bootstrap

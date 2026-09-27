@@ -4,6 +4,15 @@ pids=()
 cleanup() { trap - EXIT TERM INT; kill "${pids[@]}" 2>/dev/null || true; wait || true; }
 trap cleanup EXIT
 trap 'exit 0' TERM INT
+# Docker keeps /tmp when restarting a container. A forced stop can leave Xvfb's
+# lock pointing at a PID reused on the next start, so Xvfb cannot recover itself.
+[[ "$DISPLAY" =~ ^:([0-9]+)(\.[0-9]+)?$ ]] || { echo "Invalid runner DISPLAY: $DISPLAY" >&2; exit 1; }
+display_number=${BASH_REMATCH[1]}
+if xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; then
+    echo "Runner display $DISPLAY is already in use." >&2
+    exit 1
+fi
+rm -f "/tmp/.X${display_number}-lock" "/tmp/.X11-unix/X${display_number}"
 Xvfb "$DISPLAY" -screen 0 1600x1000x24 -nolisten tcp &
 pids+=("$!")
 for attempt in {1..50}; do
@@ -25,5 +34,7 @@ pids+=("$!")
 pids+=("$!")
 websockify --web=/usr/share/novnc 6080 localhost:5900 &
 pids+=("$!")
-wait -n "${pids[@]}"
+status=0
+wait -n -p exited "${pids[@]}" || status=$?
+echo "Cypress desktop process ${exited:-unknown} exited (status $status)." >&2
 exit 1
