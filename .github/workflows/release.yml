@@ -3,7 +3,7 @@ name: Publish release
 on:
   push:
     branches: [main]
-    paths: ['package.json', '.github/workflows/release.yml']
+    paths: ['package.json', 'CHANGELOG.md', '.github/workflows/release.yml']
     tags: ['v*']
 
 permissions:
@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Publish notes from the annotated version tag
+      - name: Publish notes from the changelog
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -32,9 +32,16 @@ jobs:
           if [[ "$RELEASE_REF_TYPE" == tag ]]; then
             [[ "$RELEASE_REF" == "$RELEASE_TAG" ]]
           fi
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then exit 0; fi
+          awk -v version="${RELEASE_TAG#v}" '
+            /^## / { if (selected) exit; selected = ($2 == version); next }
+            selected { print }
+          ' CHANGELOG.md > ../release-notes.md
+          [[ -s ../release-notes.md ]]
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --notes-file ../release-notes.md
+            exit 0
+          fi
           # A version commit can arrive before its tag; the tag push will publish it.
           if ! git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null; then exit 0; fi
-          git fetch --depth 1 origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
-          gh release create "$RELEASE_TAG" --verify-tag --notes-from-tag \
+          gh release create "$RELEASE_TAG" --verify-tag --notes-file ../release-notes.md \
             --title "MageLens $RELEASE_TAG" --latest

@@ -5,8 +5,6 @@
 - The Cypress runner recovers after an interrupted container shutdown, including during installation's SSL restart.
 - Installation and coverage commands print service logs when a required container fails to start.
 
-Validated with a fresh Magento install, all five Cypress tests, all three reports, 25 integration tests, and repeated runner restarts after graceful and forced shutdowns.
-
 ## 1.0.4 — 2026-09-27
 
 - The bundled demo now selects its real storefront theme when no theme is configured. Reinstalling preserves your theme choices.
@@ -16,5 +14,3 @@ Validated with a fresh Magento install, all five Cypress tests, all three report
 - Magento's first-use generated classes no longer invalidate an otherwise valid PHP report.
 - The storefront CSRF test now checks the rejection redirect without consuming its error message.
 - Setup and patch documentation is shorter, and installation archives omit maintainer tests and release automation.
-
-Validated with all five Cypress tests and all three reports on both the demo and an alternate local theme, plus 22 integration tests.
