@@ -1,5 +1,12 @@
 # Release notes
 
+## 1.0.7 — 2026-09-27
+
+- Demo tests wait for asynchronous storefront and theme templates to render before checking the page.
+- An interrupted Admin scenario no longer changes the storefront scenario's expected article count.
+
+When updating from v1.0.6, replace the project files and run `./bin/run-coverage` directly; rerunning the installer is unnecessary.
+
 ## 1.0.6 — 2026-09-27
 
 - Coverage runs reuse running services and unchanged browser instrumentation. They no longer restart containers, rewrite Magento configuration, or clear caches and static assets automatically.

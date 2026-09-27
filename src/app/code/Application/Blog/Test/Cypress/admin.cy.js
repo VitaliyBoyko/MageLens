@@ -1,4 +1,4 @@
-import {fixtures, headers, get, login, section, findRecord, save, remove} from './support';
+import {fixtures, headers, get, login, section, findRecord, save, remove, visitBlog} from './support';
 
 function fillPost(title, slug, category) {
     cy.get('#blog-title').clear().type(title);
@@ -11,7 +11,10 @@ function fillPost(title, slug, category) {
 
 describe('Blog Admin and publishing', () => {
     it('creates a category and illustrated article, publishes, moderates comments, and deletes records', () => {
-        const f = fixtures(), title = f.query + ' Published in Admin', slug = f.prefix + 'admin-article', category = f.query + ' Editors';
+        // Keep records created here out of the storefront scenario's search,
+        // even if this scenario stops before reaching its deletion checks.
+        const f = fixtures(), query = 'Admin-' + f.run;
+        const title = query + ' Published in Admin', slug = f.prefix + 'admin-article', category = query + ' Editors';
         login();
         section('categories');
         get('admin-new').click();
@@ -37,7 +40,7 @@ describe('Blog Admin and publishing', () => {
         cy.request({url: '/blog/post/view/slug/' + slug, headers: headers(), failOnStatusCode: false}).its('status').should('equal', 404);
         cy.get('#blog-date').clear();
         save();
-        cy.visit('/blog/?q=' + encodeURIComponent(title));
+        visitBlog(title);
         get('status').should('have.text', '1 articles');
         get('post').find('img').should('be.visible');
         get('read-post').click();
@@ -48,7 +51,7 @@ describe('Blog Admin and publishing', () => {
         get('article-body').should('contain', '<script>').find('script').should('not.exist');
         cy.screenshot('blog-storefront-article', {capture: 'viewport'});
         get('comment-form').within(() => {
-            cy.get('[name="name"]').type(f.query + ' Reader');
+            cy.get('[name="name"]').type(query + ' Reader');
             cy.get('[name="email"]').type('private-reader@example.test');
             cy.get('[name="body"]').type('Thoughtful article. <img src=x onerror=alert(1)>');
         });
@@ -64,7 +67,7 @@ describe('Blog Admin and publishing', () => {
         cy.get('.message-error').should('contain', 'wait a minute');
         cy.visit('/admin/');
         section('comments');
-        findRecord(f.query + ' Reader');
+        findRecord(query + ' Reader');
         get('comment-content').should('contain', '<img');
         cy.get('#comment-status').select('approved');
         save();
@@ -84,7 +87,7 @@ describe('Blog Admin and publishing', () => {
         cy.get('.modal-popup._show .action-accept').click();
         cy.get('.message-error').should('contain', 'Move or delete');
         section('comments');
-        findRecord(f.query + ' Reader');
+        findRecord(query + ' Reader');
         cy.get('#comment-status').select('rejected');
         save();
         cy.request({url: '/blog/post/view/slug/' + slug, headers: headers()}).its('body').should('not.contain', 'Thoughtful article.');

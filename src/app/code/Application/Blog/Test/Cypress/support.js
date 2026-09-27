@@ -1,6 +1,17 @@
 export const fixtures = () => Cypress.expose('projectFixtures').Application_Blog;
 export const headers = () => ({'x-application-coverage': Cypress.expose('coverageRun')});
 export const get = (name) => cy.get(`[data-cy="${name}"]`);
+export function waitForBlog() {
+    // Magento loads AMD components and Knockout templates after window:load.
+    // Treat that bootstrap as page loading; ordinary interactions keep their
+    // shorter timeout. Cached pages resolve this check immediately.
+    return cy.get('[data-cy="status"]', {timeout: Cypress.config('pageLoadTimeout')})
+        .should('be.visible').and('not.contain', 'Loading');
+}
+export function visitBlog(query = '') {
+    cy.visit('/blog/', {qs: query ? {q: query} : {}});
+    return waitForBlog();
+}
 export function login(username = 'application', password = 'ApplicationOnly123456!') {
     cy.visit('/admin/');
     cy.get('#username').type(username);

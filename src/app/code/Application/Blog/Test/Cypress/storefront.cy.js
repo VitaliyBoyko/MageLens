@@ -1,12 +1,13 @@
-import {fixtures, headers, get, search} from './support';
+import {fixtures, headers, get, search, visitBlog, waitForBlog} from './support';
 
 describe('Blog storefront', () => {
     it('searches, filters, paginates, reads articles, and retains favorites', () => {
         const f = fixtures();
         cy.intercept('GET', '**/Application_Blog/template/theme-note.html*').as('themeNote');
-        cy.visit(`/blog/?q=${f.query}`);
+        visitBlog(f.query);
         if (f.themePaths[0] === 'Application/coverage') {
-            get('theme-note').should('contain', 'Ideas, engineering');
+            cy.get('[data-cy="theme-note"]', {timeout: Cypress.config('pageLoadTimeout')})
+                .should('contain', 'Ideas, engineering');
             cy.wait('@themeNote').its('request.url').should('include', `/frontend/${f.themePaths[0]}/`);
         }
         get('status').should('have.text', '8 articles');
@@ -21,6 +22,7 @@ describe('Blog storefront', () => {
         });
         get('favorite-notice').should('contain', 'is saved locally.');
         cy.reload();
+        waitForBlog();
         get('status').should('have.text', '8 articles');
         get('post').first().find('[data-cy="favorite"]').should('have.text', 'Unfavorite').click().should('have.text', 'Favorite');
         get('next').click();
@@ -39,6 +41,7 @@ describe('Blog storefront', () => {
         cy.get('link[rel="canonical"]').should('have.attr', 'href').and('include', f.prefix);
         get('no-comments').should('be.visible');
         cy.contains('a', 'All articles').click();
+        waitForBlog();
         search(f.query, f.prefix + 'engineering');
         get('status').should('have.text', '6 articles');
         search(f.query + '-missing');
@@ -83,9 +86,8 @@ describe('Blog storefront', () => {
         get('comment-submit').click();
         cy.get('.message-error').should('contain', 'valid email');
         get('approved-comment').should('not.exist');
-        cy.visit('/blog/');
+        visitBlog();
         cy.intercept('GET', /\/blog\/index\/posts[/?]/, {statusCode: 503, body: {error: 'Unavailable'}}).as('unavailable');
-        get('status').should('not.contain', 'Loading');
         search('unavailable');
         cy.wait('@unavailable');
         get('load-error').should('be.visible').and('contain', 'Could not load articles');
