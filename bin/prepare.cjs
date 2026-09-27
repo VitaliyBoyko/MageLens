@@ -3,25 +3,28 @@ const path = require('node:path');
 const {createHash, randomBytes} = require('node:crypto');
 const {execFileSync} = require('node:child_process');
 const {setBadgeSection} = require('./badges.cjs');
-const {discover, files, writeRuntime} = require('./project.cjs');
-function sourceHashes() {
-    return Object.fromEntries(applicationFiles().map(file => [file, createHash('sha256').update(fs.readFileSync(file)).digest('hex')]));
+const {discover, files, writeRuntime, withThemeRoots} = require('./project.cjs');
+function sourceHashes(roots) {
+    return Object.fromEntries(applicationFiles(roots).map(file => [file, createHash('sha256').update(fs.readFileSync(file)).digest('hex')]));
 }
-function applicationFiles() {
-    return discover().roots.flatMap(root => files(`src/${root}`));
+function applicationFiles(roots = discover().roots) {
+    return roots.flatMap(root => files(`src/${root}`));
 }
 
 if (require.main === module) {
-    const project = discover();
+    const discovered = discover();
+    const themeOption = process.argv.indexOf('--theme-roots');
+    const project = themeOption < 0 ? discovered : withThemeRoots(discovered, JSON.parse(fs.readFileSync(process.argv[themeOption + 1], 'utf8')));
     sourceHashes(); // Reject unsupported sources before modifying runtime copies.
     // Preserve bind-mount directory inodes; replace their contents instead.
-    for (const root of project.roots) {
+    for (const root of discovered.roots) {
         const target = `.runtime/${root}`;
         fs.mkdirSync(target, {recursive: true});
         for (const name of fs.readdirSync(target)) fs.rmSync(`${target}/${name}`, {recursive: true, force: true});
         fs.cpSync(`src/${root}`, target, {recursive: true});
     }
-    writeRuntime(project);
+    // Keep mount directories stable when switching the selected theme or restoring plain copies.
+    writeRuntime(project, discovered.roots);
     if (!process.argv.includes('--plain')) {
         const {createInstrumenter} = require('istanbul-lib-instrument');
         fs.mkdirSync('coverage', {recursive: true});
@@ -30,7 +33,7 @@ if (require.main === module) {
             fs.rmSync(directory, {recursive: true, force: true});
         }
         fs.mkdirSync('coverage/raw/templates', {recursive: true});
-        const run = {id: randomBytes(16).toString('hex'), startedAt: new Date().toISOString(), sources: sourceHashes()};
+        const run = {id: randomBytes(16).toString('hex'), startedAt: new Date().toISOString(), roots: project.roots, sources: sourceHashes(project.roots)};
         fs.mkdirSync(`coverage/raw/php/${run.id}`, {recursive: true, mode: 0o777});
         fs.chmodSync(`coverage/raw/php/${run.id}`, 0o777); // FPM's app user may differ from the host UID.
         fs.writeFileSync('coverage/run.json', JSON.stringify(run, null, 2));
@@ -45,7 +48,7 @@ if (require.main === module) {
         execFileSync(cli, ['instrument', '--source', '/source', '--manifest', 'coverage/template-manifest.json',
             ...roots.flatMap(root => ['--map', `${root}=/workspace/.runtime/${root}`])], {stdio: 'inherit'});
         const baseline = {};
-        for (const file of applicationFiles().filter(file => file.endsWith('.js'))) {
+        for (const file of applicationFiles(project.roots).filter(file => file.endsWith('.js'))) {
             const instrumenter = createInstrumenter({compact: false, preserveComments: true,
                 coverageGlobalScope: 'window', coverageGlobalScopeFunc: false});
             const instrumented = instrumenter.instrumentSync(fs.readFileSync(file, 'utf8'), path.resolve(file));

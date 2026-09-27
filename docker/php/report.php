@@ -17,7 +17,7 @@ if (!$records || glob("/coverage/raw/php/$run/*.error")) {
     throw new RuntimeException('Missing or failed PHP collection. Inspect coverage/raw/php and PHP-FPM logs.');
 }
 if (applicationIdentity()['identity']['id'] !== $state['identity']['id']) {
-    throw new RuntimeException('Deployment changed during the suite. Rerun coverage against stable sources/generated code.');
+    throw new RuntimeException('Deployment changed during the suite. Rerun coverage against stable sources and configuration.');
 }
 $merged = [];
 $requests = [];

@@ -3,8 +3,12 @@ import {fixtures, headers, get, search} from './support';
 describe('Blog storefront', () => {
     it('searches, filters, paginates, reads articles, and retains favorites', () => {
         const f = fixtures();
+        cy.intercept('GET', '**/Application_Blog/template/theme-note.html*').as('themeNote');
         cy.visit(`/blog/?q=${f.query}`);
-        get('theme-note').should('contain', 'Ideas, engineering');
+        if (f.themePaths[0] === 'Application/coverage') {
+            get('theme-note').should('contain', 'Ideas, engineering');
+            cy.wait('@themeNote').its('request.url').should('include', `/frontend/${f.themePaths[0]}/`);
+        }
         get('status').should('have.text', '8 articles');
         get('post').should('have.length', 6);
         get('post').first().within(() => {
@@ -63,7 +67,9 @@ describe('Blog storefront', () => {
         }
         cy.visit('/blog/post/view/slug/' + f.prefix + 'article-1');
         get('comment-form').invoke('attr', 'action').then(url => {
-            cy.request({url, method: 'POST', form: true, headers: headers(), body: {form_key: 'invalid', name: 'Rejected reader', email: 'reader@example.test', body: 'Must not appear'}});
+            // Keep the rejection message for the browser instead of consuming it on a followed redirect.
+            cy.request({url, method: 'POST', form: true, followRedirect: false, headers: headers(), body: {form_key: 'invalid', name: 'Rejected reader', email: 'reader@example.test', body: 'Must not appear'}})
+                .its('status').should('equal', 302);
         });
         cy.reload();
         cy.get('.message-error').should('contain', 'Invalid Form Key');

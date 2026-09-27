@@ -1,0 +1,4 @@
+# Keep maintainer tools in Git, outside source downloads used for installation.
+/tests export-ignore
+/.github export-ignore
+/.gitattributes export-ignore

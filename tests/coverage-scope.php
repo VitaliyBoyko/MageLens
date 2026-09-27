@@ -18,6 +18,16 @@ sort($expected, SORT_STRING);
 check($scope === $expected, 'PHP scope must include every source file and exclude vendor');
 foreach ($scope as $file) check(preg_match(ini_get('pcov.exclude'), $file) === 0, "PCOV excludes $file");
 
+$identity = applicationIdentity()['identity']['id'];
+mkdir('/var/www/html/generated/code/Scope', 0755, true);
+file_put_contents('/var/www/html/generated/code/Scope/Factory.php', '<?php class ScopeFactory {}');
+check(applicationIdentity()['identity']['id'] === $identity, 'First-use generated code must not invalidate scoped coverage');
+$source = '/var/www/html/app/code/root.php';
+$original = file_get_contents($source);
+file_put_contents($source, $original . "\n// source edit\n");
+check(applicationIdentity()['identity']['id'] !== $identity, 'Actual source changes must still invalidate coverage');
+file_put_contents($source, $original);
+
 pcov\start();
 require '/var/www/html/app/code/Magento/Local/registration.php';
 require '/var/www/html/vendor/magento/example/vendor.php';

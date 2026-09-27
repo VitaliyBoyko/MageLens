@@ -23,7 +23,7 @@ assert.ok(templates.templates.every(template => template.path.endsWith('.html'))
 for (const [covered, total] of [[php.covered, php.total], [js.total.lines.covered, js.total.lines.total], [templates.lines.covered, templates.lines.total]]) {
     assert.ok(Number.isFinite(covered) && Number.isFinite(total) && covered >= 0 && covered <= total, 'Invalid coverage totals');
 }
-assert.deepEqual(sourceHashes(), run.sources, 'Original sources changed during instrumentation');
+assert.deepEqual(sourceHashes(run.roots), run.sources, 'Original sources changed during instrumentation');
 for (const type of ['php', 'js', 'templates']) {
     const html = fs.readFileSync(`coverage/${type}/index.html`, 'utf8');
     assert.ok(/<html/i.test(html), `Missing HTML entry point: ${type}`);

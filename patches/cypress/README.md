@@ -1,14 +1,13 @@
 # Cypress-only Magento patches
 
-The [demo blog hooks](../../src/app/code/Application/Blog/Test/MageLens/hooks.php) apply these patches to Magento files in `src/` before the Cypress suite and reverse them during cleanup, including failed runs. `docker/php/cypress-patches.sh` checks whether each patch can be applied or reversed and stops if it does not match the installed source.
+The bundled blog demo temporarily applies two compatibility fixes while Cypress runs:
 
-`magento-framework-session-cookie-race-41057.patch` addresses a stale-cookie race after session regeneration by persisting a forwarding ID before releasing the old session and adopting that ID before validation. It targets `vendor/magento/framework/Session/SessionManager.php` in Magento 2.4.8-p5 / Framework 103.0.8-p5.
+- [Session handling](magento-framework-session-cookie-race-41057.patch) prevents intermittent session loss during login and form submissions. See [Magento issue #41057](https://github.com/magento/magento2/issues/41057).
+- [Admin forms](magento-admin-form-prototype.patch) keeps change tracking working when Cypress fills Magento Admin inputs.
 
-Related [Magento issue #41057](https://github.com/magento/magento2/issues/41057). Review the workaround when upgrading Magento.
+These patches target **Magento 2.4.8-p5**. They are applied and reverted automatically, including after failed tests. No manual setup is needed. If a patch does not match your installed Magento version, the run stops; review compatibility before retrying.
 
-`magento-admin-form-prototype.patch` keeps Magento Admin change tracking working when Cypress presents input elements from a different DOM prototype chain. It calls the existing change handler directly and uses the static Prototype class helper. It targets `lib/web/mage/adminhtml/form.js` in Magento 2.4.8-p5.
-
-Changes to patches or patched source invalidate the PHP coverage manifest. After an interrupted run, the next coverage run reverses any applied patches during its initial cleanup. To restore them manually, run:
+After a forcibly interrupted run, rerun `./bin/run-coverage` to recover automatically, or restore the Magento files without running tests:
 
 ```bash
 ./bin/application-compose run --rm --no-deps phpfpm bash /application/docker/php/cypress-patches.sh revert

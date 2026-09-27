@@ -30,7 +30,9 @@ function applicationIdentity(): array
             'application_revision' => hash_file('sha256', "$root/composer.json"),
             'dependency_lock' => hash_file('sha256', "$root/composer.lock"),
             'modules_config' => $digest(["$root/app/etc/config.php", "$root/app/etc/env.php"]),
-            'generated_code' => $digest(array_merge(applicationFiles("$root/generated/code"), applicationFiles("$root/generated/metadata"))),
+            // Developer mode creates factories/interceptors on first use. They are
+            // outside coverage scope; only compiled DI metadata is a deployment input.
+            'generated_code' => $digest(applicationFiles("$root/generated/metadata")),
             'source_tree' => $digest($sources),
             'coverage_config' => $digest([__DIR__ . '/coverage.ini', __DIR__ . '/collect.php', __FILE__, '/application/project.json', '/usr/local/etc/php/conf.d/zzz-magelens-scope.ini']),
             'cypress_patches' => $digest(array_merge(applicationPatchFiles(), array_values(array_filter(["$root/vendor/magento/framework/Session/SessionManager.php", "$root/lib/web/mage/adminhtml/form.js"], 'is_file')))),

@@ -19,10 +19,12 @@ Run `./bin/run-coverage` to generate coverage reports and badges for your projec
 Run this inside the empty directory you want to use for MageLens:
 
 ```bash
-wget -qO- https://github.com/VitaliyBoyko/MageLens/archive/refs/heads/main.tar.gz | tar -xz --strip-components=1 && ./install.sh
+wget -qO- https://github.com/VitaliyBoyko/MageLens/archive/refs/tags/v1.0.4.tar.gz | tar -xz --strip-components=1 && ./install.sh
 ```
 
 If you have already cloned or downloaded MageLens, run `./install.sh` from its project directory.
+
+See the [release notes](CHANGELOG.md) for changes in this version.
 
 Then generate coverage reports:
 
@@ -70,7 +72,7 @@ Mark Shust's `bin/setup-domain` adds the domain to your hosts file and configure
 
 Open `coverage/index.html` directly in your browser for the combined view. Each successful full run also refreshes the four SVG badges in `coverage/badges/` and the managed badge section in this README. Reports are generated locally and are ignored by Git; the badges can be committed. Archive `coverage/` to share the browsable reports.
 
-Coverage includes every PHP/`.phtml`, JavaScript `.js`, and HTML template file under `src/app/code/`, `src/app/design/frontend/`, and `src/app/design/adminhtml/`. Files not executed by the browser suite remain uncovered, including setup and test helpers that run only through CLI.
+Coverage includes every PHP/`.phtml`, JavaScript `.js`, and HTML template file under `src/app/code/`, plus selected storefront and Admin themes and their local parents under `src/app/design/`. The theme scope is resolved from Magento on each run; inactive themes and `vendor/` are excluded. Unexecuted files within that scope remain uncovered, including setup and test helpers that run only through CLI.
 
 Read the [coverage guide](docs/coverage.md) for report semantics, collection details, and adding tests and fixtures.
 
@@ -122,7 +124,9 @@ Copy them into their normal Magento locations, for example `src/app/code/YourVen
 ./bin/run-coverage
 ```
 
-The installer enables newly discovered modules and preserves explicitly disabled modules. Add tests under `cypress/e2e/` or inside a module's `Test/Cypress/` directory. A fresh installation selects a local storefront theme automatically when exactly one is available. Existing theme selection is preserved.
+The installer enables newly discovered modules and preserves explicitly disabled modules. Add tests under `cypress/e2e/` or inside a module's `Test/Cypress/` directory.
+
+When no storefront theme is configured, installation selects your local theme if exactly one is available. The bundled demo therefore starts with its own theme. Existing theme choices are preserved on reruns. To switch themes or choose among several, use **Content → Design → Configuration**; the next coverage run follows your selection.
 
 ### Copy a complete Magento project
 

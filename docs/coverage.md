@@ -4,19 +4,18 @@ Run `./bin/run-coverage` from the repository root, then open `coverage/index.htm
 
 ## Coverage scope
 
-Coverage includes all supported files under these source directories:
+Coverage includes supported files in:
 
 - `src/app/code/`
-- `src/app/design/frontend/`
-- `src/app/design/adminhtml/`
+- The selected frontend and Admin themes under `src/app/design/`, including their local parent themes.
 
-PHP and `.phtml` files appear in the PHP report, `.js` files in the JavaScript report, and `.html` files in the template report. Files are included regardless of namespace or purpose. Unexecuted files remain uncovered, including setup and test helpers that run only through CLI. Composer packages under `src/vendor/` are outside this scope.
+PHP and `.phtml` files appear in the PHP report, `.js` files in the JavaScript report, and `.html` files in the template report. Files within this scope are included regardless of namespace or purpose. Unexecuted files remain uncovered, including setup and test helpers that run only through CLI. Unrelated inactive themes and Composer packages under `src/vendor/` are excluded. Each run resolves the configured themes for active stores and Admin before instrumenting sources, so changing the selected theme updates all three reports.
 
-Instrumentation uses disposable copies under `.runtime/app/`. Each run verifies that the original source files are unchanged. Symlinked source files and directories are unsupported.
+Coverage runs use disposable source copies and verify that your originals remain unchanged. Symlinked source files and directories are unsupported.
 
 ## Run lifecycle
 
-Each run stops PHP-FPM, clears previous coverage artifacts, prepares instrumented source copies, starts the application, and clears generated static assets before Cypress runs. Developer mode generates the requested JavaScript, CSS, and templates on demand. Installation and coverage share a lock, so run one command at a time.
+Each run replaces previous reports, prepares fresh source copies, and refreshes static assets before starting Cypress. Run installation and coverage commands one at a time.
 
 The suite temporarily uses Docker's internal `http://app:8000/` URL. Cleanup restores HTTPS on your selected domain and plain source copies, then clears instrumented static assets, including after test failures. Wait for the command to finish before browsing the application manually.
 
@@ -32,13 +31,11 @@ Use your configured `APPLICATION_DOMAIN` and `CYPRESS_VIEW_PORT` if they differ 
 
 ## PHP coverage
 
-[VitaliyBoyko/pcov](https://github.com/VitaliyBoyko/pcov) collects PHP execution from Magento HTTP requests associated with the current Cypress run. The browser sends a run token in an HttpOnly cookie; direct test requests can use the `X-Application-Coverage` header. CLI execution is outside the collection scope.
+[PCOV](https://github.com/VitaliyBoyko/pcov) collects PHP execution from Magento HTTP requests made during the current Cypress run. CLI execution is outside the collection scope.
 
 The PHP report measures executable lines. Unvisited files are included through static analysis with zero hits. `phpunit/php-code-coverage` generates HTML and Clover reports.
 
-Collection starts in full-discovery mode. If requests load every scoped PHP file, the reporter saves an executable-line manifest under `.runtime/pcov/`. Later runs can reuse that manifest while recording fresh execution hits. Changes to source, configuration, dependencies, or the PHP/PCOV environment trigger full discovery again. Projects with files that are never loaded by HTTP requests remain in full-discovery mode.
-
-Magento GET export caching is enabled for eligible requests when a complete manifest is available. Inspect `coverage/php/coverage-summary.json` for collection mode, request metadata, and cache counts. The cache reuses serialized exports while requests continue to execute PHP.
+Every run records fresh execution. Cached collection metadata is refreshed automatically when source, configuration, or dependencies change.
 
 ## JavaScript coverage
 

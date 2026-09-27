@@ -1,17 +1,69 @@
 <?php
-require '/var/www/html/app/bootstrap.php';
-require __DIR__ . '/project.php';
-$bootstrap = Magento\Framework\App\Bootstrap::create(BP, $_SERVER);
-$om = $bootstrap->getObjectManager();
-$om->get(Magento\Framework\App\State::class)->setAreaCode('adminhtml');
-$om->get(Magento\Theme\Model\Theme\Registration::class)->register();
-$themes = [];
-foreach ($om->create(Magento\Theme\Model\ResourceModel\Theme\Collection::class)->addFieldToFilter('area', 'frontend') as $theme) {
-    foreach (project()['roots'] as $root) {
-        if (str_starts_with('app/design/frontend/' . $theme->getThemePath(), $root . '/')) $themes[] = $theme;
+declare(strict_types=1);
+
+function localFrontendThemes(array $registered, array $roots, string $basePath): array
+{
+    $themes = [];
+    foreach ($registered as $name => $directory) {
+        // Blank and Luma are also under app/design in Magento source archives.
+        if (!str_starts_with($name, 'frontend/')
+            || in_array($name, ['frontend/Magento/blank', 'frontend/Magento/luma'], true)
+            || !str_starts_with($directory, $basePath . '/app/design/frontend/')
+        ) continue;
+        foreach ($roots as $root) {
+            $sourceDirectory = $basePath . '/' . trim($root, '/');
+            if ($directory === $sourceDirectory || str_starts_with($directory, $sourceDirectory . '/')) {
+                $themes[] = substr($name, strlen('frontend/'));
+                break;
+            }
+        }
     }
+    sort($themes);
+    return $themes;
 }
-if (count($themes) === 1) {
-    $om->get(Magento\Framework\App\Config\Storage\WriterInterface::class)->save('design/theme/theme_id', $themes[0]->getId());
-    echo 'Enabled custom theme ', $themes[0]->getThemePath(), "\n";
+
+function configureProjectTheme(Magento\Framework\ObjectManagerInterface $om, array $roots): void
+{
+    $om->get(Magento\Theme\Model\Theme\Registration::class)->register();
+    $path = 'design/theme/theme_id';
+    $config = $om->get(Magento\Framework\App\Config\ScopeConfigInterface::class);
+    $stores = $om->get(Magento\Store\Model\StoreManagerInterface::class);
+    $scopes = [['default', null]];
+    foreach ($stores->getWebsites() as $website) $scopes[] = ['websites', $website->getCode()];
+    foreach ($stores->getStores() as $store) $scopes[] = ['stores', $store->getCode()];
+    // Read effective configuration so database, config.php, env.php and environment
+    // selections at every scope take precedence over installer defaults.
+    foreach ($scopes as [$scope, $code]) {
+        if ($config->getValue($path, $scope, $code)) {
+            echo "Preserved configured storefront theme.\n";
+            return;
+        }
+    }
+    $registrar = $om->get(Magento\Framework\Component\ComponentRegistrar::class);
+    $themes = localFrontendThemes($registrar->getPaths(Magento\Framework\Component\ComponentRegistrar::THEME), $roots, BP);
+    if (!$themes) {
+        echo "No local storefront theme to select.\n";
+        return;
+    }
+    if (count($themes) > 1) {
+        echo 'Multiple local storefront themes (', implode(', ', $themes), "). Select one in Content > Design > Configuration.\n";
+        return;
+    }
+    $theme = $om->create(Magento\Theme\Model\ResourceModel\Theme\Collection::class)
+        ->addFieldToFilter('area', 'frontend')
+        ->addFieldToFilter('type', Magento\Framework\View\Design\ThemeInterface::TYPE_PHYSICAL)
+        ->addFieldToFilter('theme_path', $themes[0])->getFirstItem();
+    if (!$theme->getId()) throw new RuntimeException('Local storefront theme was not registered: ' . $themes[0]);
+    $om->get(Magento\Framework\App\Config\Storage\WriterInterface::class)->save($path, $theme->getId());
+    $om->get(Magento\Framework\App\Cache\TypeListInterface::class)->cleanType('config');
+    $om->get(Magento\Framework\App\Config\ReinitableConfigInterface::class)->reinit();
+    echo 'Enabled custom theme ', $themes[0], "\n";
+}
+
+if (realpath($_SERVER['SCRIPT_FILENAME']) === __FILE__) {
+    require '/var/www/html/app/bootstrap.php';
+    require __DIR__ . '/project.php';
+    $om = Magento\Framework\App\Bootstrap::create(BP, $_SERVER)->getObjectManager();
+    $om->get(Magento\Framework\App\State::class)->setAreaCode('adminhtml');
+    configureProjectTheme($om, project()['roots']);
 }

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const {discover, specPatterns, writeRuntime} = require('../bin/project.cjs');
+const {discover, specPatterns, writeRuntime, withThemeRoots} = require('../bin/project.cjs');
 const {sourceHashes} = require('../bin/prepare.cjs');
 
 function workspace(t) {
@@ -26,8 +26,11 @@ test('copied namespaces and both theme areas are discovered without the demonstr
     assert.deepEqual(project.modules, [{name: 'Magento_Catalog', root: 'app/code/Magento/Catalog'}, {name: 'Vitalii_TodoList', root: 'app/code/Vitalii/TodoList'}]);
     assert.deepEqual(specPatterns(), ['cypress/e2e/**/*.cy.js', 'src/app/code/Magento/Catalog/Test/Cypress/**/*.cy.js', 'src/app/code/Vitalii/TodoList/Test/Cypress/**/*.cy.js']);
     writeRuntime(project);
-    const mounts = JSON.parse(fs.readFileSync('.runtime/compose.sources.json')).services.phpfpm.volumes;
+    const services = JSON.parse(fs.readFileSync('.runtime/compose.sources.json')).services;
+    const mounts = services.phpfpm.volumes;
     for (const root of project.roots) assert.ok(mounts.some(mount => mount.target === `/var/www/html/${root}` && mount.read_only));
+    assert.deepEqual(services.app.volumes, mounts.filter(mount => mount.target.startsWith('/var/www/html/')),
+        'Nginx must resolve static symlinks to the same runtime copies as PHP');
     // Removing source must remove it from discovery and the next scope.
     fs.rmSync('src/app/code', {recursive: true});
     writeRuntime(discover());
@@ -56,4 +59,33 @@ test('source namespace symlinks fail clearly instead of instrumenting external f
     fs.mkdirSync('external');
     fs.symlinkSync(`${root}/external`, 'src/app/code/External');
     assert.throws(() => discover(), /Symlinked source/);
+});
+
+test('coverage follows selected local themes and their parents while runtime mounts stay stable', t => {
+    workspace(t);
+    const themes = ['app/design/frontend/Client/shop', 'app/design/frontend/Client/base',
+        'app/design/frontend/Client/inactive', 'app/design/adminhtml/Client/admin'];
+    fs.mkdirSync('src/app/code/Client/Module', {recursive: true});
+    fs.writeFileSync('src/app/code/Client/Module/example.php', '<?php echo "module";');
+    for (const theme of themes) {
+        fs.mkdirSync(`src/${theme}`, {recursive: true});
+        fs.writeFileSync(`src/${theme}/theme.xml`, '<theme/>');
+    }
+    const discovered = discover();
+    const project = withThemeRoots(discovered, [themes[0], themes[1], themes[3], themes[0]]);
+    assert.deepEqual(project.roots, ['app/code', themes[3], themes[1], themes[0]]);
+    const hashes = sourceHashes(project.roots);
+    assert.ok(hashes['src/app/code/Client/Module/example.php']);
+    assert.ok(hashes[`src/${themes[0]}/theme.xml`]);
+    assert.ok(hashes[`src/${themes[1]}/theme.xml`]);
+    assert.equal(hashes[`src/${themes[2]}/theme.xml`], undefined);
+    writeRuntime(project, discovered.roots);
+    const mounts = JSON.parse(fs.readFileSync('.runtime/compose.sources.json')).services.phpfpm.volumes;
+    assert.ok(mounts.some(mount => mount.target === '/var/www/html/app/design/frontend'));
+    assert.ok(!mounts.some(mount => mount.target.endsWith('/Client/shop')));
+    assert.ok(!fs.readFileSync('.runtime/coverage.ini', 'utf8').includes('inactive'));
+    assert.deepEqual(withThemeRoots(discovered, []).roots, ['app/code'], 'Composer themes do not add vendor roots');
+    for (const invalid of ['vendor/magento/theme-frontend-blank', 'app/design/frontend/Client/../inactive', 'app/design/frontend/Client/missing']) {
+        assert.throws(() => withThemeRoots(discovered, [invalid]), /Invalid selected theme/);
+    }
 });

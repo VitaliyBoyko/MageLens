@@ -28,6 +28,8 @@ Admin uses Magento's normal login, Blog ACL permission, secret URL keys, and for
 
 Content is shared across this installation's store views, with one category per post. Articles and comments use plain text. This demo is intended for local development.
 
+The demo starts with its own storefront theme. You can switch themes in **Content → Design → Configuration**; the blog's functional tests continue to run, while the journal note is checked only for the demo theme. Reports follow the selected themes and their local parents, excluding inactive themes and `vendor`.
+
 ## What Cypress verifies
 
 Five tests exercise storefront discovery, favorites, pagination, publication visibility, Admin creation/editing/deletion, image upload/removal, SEO output, moderated comments, input validation, escaped output, CSRF rejection, and restricted-role authorization. They use real Magento forms and HTTP requests. One test publishes an article in Admin, reads it on the storefront, submits and moderates a comment, and removes its records.

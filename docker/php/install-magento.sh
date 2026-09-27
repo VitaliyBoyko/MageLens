@@ -16,9 +16,7 @@ if [[ -f .magelens-imported ]]; then
             }
         }'
 fi
-fresh=no
 if [[ ! -f app/etc/env.php ]]; then
-    fresh=yes
     as_app php bin/magento setup:install \
         --base-url="$(bash /application/docker/php/base-url.sh --print)" \
         --base-url-secure="$(bash /application/docker/php/base-url.sh --print)" --db-host=db --db-name=magento \
@@ -42,7 +40,7 @@ if [[ "$current_mode" != developer ]]; then
     as_app php bin/magento deploy:mode:set developer
 fi
 as_app php bin/magento config:set twofactorauth/general/enable 0
-if [[ "$fresh" == yes ]]; then as_app php /application/docker/php/configure-theme.php; fi
+as_app php /application/docker/php/configure-theme.php
 as_app bash /application/docker/php/base-url.sh
 as_app php bin/magento config:set web/url/redirect_to_base 0
 as_app php bin/magento config:set dev/static/sign 0

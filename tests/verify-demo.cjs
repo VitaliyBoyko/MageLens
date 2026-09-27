@@ -5,6 +5,9 @@ const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const php = read('coverage/php/coverage-summary.json');
 const js = read('coverage/js/coverage-summary.json');
 const templates = read('coverage/templates/coverage-summary.json');
+const demoThemeActive = read('coverage/project-fixtures.json').Application_Blog.themePaths[0] === 'Application/coverage';
+const expectedTemplates = ['web/template/list.html', 'web/template/details.html', 'web/html/favorite.html', 'web/template/editor-preview.html'];
+if (demoThemeActive) expectedTemplates.push('web/template/theme-note.html');
 assert.ok(php.covered > 0 && php.covered < php.total);
 for (const route of ['/application_blog/manage/save/', '/blog/post/comment/']) {
     assert.ok(php.requests.some(request => request.method === 'POST' && request.uri.includes(route)), `Missing real PHP POST collection: ${route}`);
@@ -23,18 +26,20 @@ assert.equal(templates.schemaVersion, 2);
 assert.ok(templates.lines.covered > 0 && templates.lines.covered < templates.lines.total);
 assert.ok(templates.statements.covered > 0 && templates.statements.covered < templates.statements.total);
 assert.ok(templates.templates.every(template => template.path.endsWith('.html')), 'PHP templates do not belong in the browser-template report');
-for (const suffix of ['web/template/list.html', 'web/template/details.html', 'web/template/theme-note.html', 'web/html/favorite.html', 'web/template/editor-preview.html']) {
+for (const suffix of expectedTemplates) {
     assert.ok(templates.templates.some(t => t.path.endsWith(suffix) && t.status === 'observed'), `Missing DOM hit: ${suffix}`);
 }
-assert.ok(templates.templates.some(t => t.path.includes('app/design/') && t.status === 'observed'));
+if (demoThemeActive) assert.ok(templates.templates.some(t => t.path.includes('app/design/') && t.status === 'observed'));
 assert.ok(templates.templates.some(t => t.path.endsWith('editorial-preview.html') && t.status === 'unobserved'));
-for (const suffix of ['web/template/list.html', 'web/template/details.html', 'web/template/theme-note.html', 'web/html/favorite.html', 'web/template/editor-preview.html']) {
+for (const suffix of expectedTemplates) {
     const entry = templates.templates.find(template => template.path.endsWith(suffix));
     assert.ok(entry.statementSummary.covered > 0, `Missing binding execution: ${suffix}`);
     assert.ok(fs.statSync(`coverage/templates/files/${entry.id}.html`).size > 0);
 }
 assert.ok(templates.directories.some(directory => directory.path === 'app/code'));
-assert.ok(templates.directories.some(directory => directory.path === 'app/design'));
+if (templates.templates.some(template => template.path.startsWith('app/design/'))) {
+    assert.ok(templates.directories.some(directory => directory.path === 'app/design'));
+}
 assert.ok(templates.templates.find(template => template.path.endsWith('web/html/favorite.html')).statements.some(statement => statement.syntax === 'underscore:escape' && statement.hits > 0));
 const listTemplate = templates.templates.find(template => template.path.endsWith('web/template/list.html'));
 const unusedLine = listTemplate.source.split('\n').findIndex(line => line.includes('data-cy="unpublished-post"')) + 1;

@@ -31,6 +31,17 @@ function specPatterns() {
     return ['cypress/e2e/**/*.cy.js', ...discover().modules.map(module => `src/${module.root}/Test/Cypress/**/*.cy.js`)];
 }
 
+function withThemeRoots(project, themeRoots, source = 'src') {
+    if (!Array.isArray(themeRoots)) throw new Error('Expected selected theme directories');
+    for (const root of themeRoots) {
+        if (typeof root !== 'string' || !/^app\/design\/(frontend|adminhtml)\/[^/.][^/]*\/[^/.][^/]*$/.test(root)
+            || !fs.existsSync(`${source}/${root}/theme.xml`)) {
+            throw new Error(`Invalid selected theme directory: ${root}`);
+        }
+    }
+    return {...project, roots: [...project.roots.filter(root => root === 'app/code'), ...new Set(themeRoots.sort())]};
+}
+
 function files(root) {
     return fs.readdirSync(root, {withFileTypes: true}).sort((a, b) => a.name.localeCompare(b.name)).flatMap(entry => {
         const file = path.join(root, entry.name);
@@ -39,18 +50,23 @@ function files(root) {
     });
 }
 
-function writeRuntime(project) {
+function writeRuntime(project, mountRoots = project.roots) {
     fs.mkdirSync('.runtime', {recursive: true});
     fs.writeFileSync('.runtime/project.json', JSON.stringify(project, null, 2));
     const escape = value => value.replace(/[.*+?^${}()|[\]\\~]/g, '\\$&');
     const allowed = project.roots.map(root => escape(`/var/www/html/${root}/`)).join('|') || '(?!)';
     fs.writeFileSync('.runtime/coverage.ini', `pcov.directory=/var/www/html/app\npcov.exclude="~^(?!(?:${allowed}))~"\n`);
     const mount = (source, target) => ({type: 'bind', source, target, read_only: true});
-    fs.writeFileSync('.runtime/compose.sources.json', JSON.stringify({services: {phpfpm: {volumes: [
-        ...project.roots.map(root => mount(`./.runtime/${root}`, `/var/www/html/${root}`)),
-        mount('./.runtime/project.json', '/application/project.json'),
-        mount('./.runtime/coverage.ini', '/usr/local/etc/php/conf.d/zzz-magelens-scope.ini')
-    ]}}}, null, 2));
+    const sources = mountRoots.map(root => mount(`./.runtime/${root}`, `/var/www/html/${root}`));
+    // Magento publishes static assets as symlinks in developer mode. Nginx must
+    // resolve those links to the same copies PHP used for the first response.
+    fs.writeFileSync('.runtime/compose.sources.json', JSON.stringify({services: {
+        app: {volumes: sources},
+        phpfpm: {volumes: [...sources,
+            mount('./.runtime/project.json', '/application/project.json'),
+            mount('./.runtime/coverage.ini', '/usr/local/etc/php/conf.d/zzz-magelens-scope.ini')
+        ]}
+    }}, null, 2));
 }
 
-module.exports = {discover, files, writeRuntime, specPatterns};
+module.exports = {discover, files, writeRuntime, specPatterns, withThemeRoots};

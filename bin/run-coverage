@@ -23,7 +23,9 @@ dc up -d --wait --wait-timeout 180 db redis opensearch runner
 dc stop -t 60 phpfpm
 dc run --rm --no-deps phpfpm php /application/docker/php/project-hooks.php cleanup
 say 'Creating a new run, disposable template copies, and instrumented JavaScript'
-dc run --rm --no-deps runner node bin/prepare.cjs
+dc run --rm --no-deps runner node bin/prepare.cjs --plain
+dc run --rm --no-deps phpfpm php /application/docker/php/theme-scope.php > .runtime/active-themes.json
+dc run --rm --no-deps runner node bin/prepare.cjs --theme-roots .runtime/active-themes.json
 dc run --rm --no-deps phpfpm php /application/docker/php/project-hooks.php before
 dc run --rm --no-deps phpfpm bash /application/docker/php/base-url.sh http://app:8000/
 dc up -d phpfpm app
