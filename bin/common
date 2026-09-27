@@ -17,6 +17,14 @@ dc() {
 }
 say() { printf '\n==> %s\n' "$*"; }
 fail() { printf '\nError: %s\n' "$*" >&2; exit 1; }
+start_php_for_setup() {
+    # Fresh named volumes belong to root. Initialize them before non-root PHP starts.
+    dc run --rm --no-deps --user root phpfpm chown "$LOCAL_UID:$LOCAL_GID" /sock /var/www/.composer /bootstrap
+    if ! dc up -d --wait --wait-timeout 60 phpfpm; then
+        dc logs --tail 50 phpfpm
+        fail 'PHP-FPM could not start. See the container logs above.'
+    fi
+}
 preflight() {
     command -v docker >/dev/null || fail 'Install Docker with Compose v2.24.4 or newer, then rerun ./install.sh.'
     docker info >/dev/null 2>&1 || fail 'Docker is unavailable. Start Docker and ensure your user can run docker info.'

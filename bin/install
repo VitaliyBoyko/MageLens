@@ -32,8 +32,7 @@ dc build --pull phpfpm runner
 dc run --rm --no-deps --user root runner chown -R "$LOCAL_UID:$LOCAL_GID" /workspace/node_modules
 dc run --rm --no-deps runner npm ci --ignore-scripts --no-audit --no-fund
 say 'Configuring Composer with the upstream Docker Magento tools'
-dc up -d phpfpm
-dc exec -T --user root phpfpm chown "$LOCAL_UID:$LOCAL_GID" /var/www/.composer /bootstrap
+start_php_for_setup
 "$ROOT/bin/setup-composer-auth"
 if [[ ! -f src/.magelens-imported && ( ! -f src/composer.json || -f src/.application-source-ready ) ]]; then
     say 'Installing Magento Composer packages (core code stays in vendor/)'

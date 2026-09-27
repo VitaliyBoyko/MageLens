@@ -53,6 +53,12 @@ services:
       APPLICATION_UID: ${LOCAL_UID:-1000}
       APPLICATION_GID: ${LOCAL_GID:-1000}
       MAGENTO_VERSION: ${MAGENTO_VERSION:?Missing dependencies.yaml configuration}
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@fsockopen('unix:///sock/phpfpm.sock') ? 0 : 1);"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
   # Explicit install-only job; the old volume is retained for safe migration.
   workspace:
     extends:

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname "$0")/../bin/common"
+preflight
+scratch=$(mktemp -d /tmp/magelens-bootstrap.XXXXXX)
+project="magelens-bootstrap-$(basename "$scratch" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')"
+cleanup() {
+    (cd "$scratch" && COMPOSE_PROJECT_NAME="$project" ./bin/application-compose down --volumes --remove-orphans) >/dev/null 2>&1 || true
+    rm -rf "$scratch"
+}
+trap cleanup EXIT
+mkdir -p "$scratch/bin" "$scratch/src" "$scratch/coverage" "$scratch/.runtime/pcov" "$scratch/.runtime/magento" "$scratch/.runtime/docker-magento"
+cp compose.yaml dependencies.yaml "$scratch/"
+cp bin/common bin/dependencies bin/application-compose bin/expose-tools "$scratch/bin/"
+cp -a docker patches "$scratch/"
+cp -a .runtime/docker-magento/compose "$scratch/.runtime/docker-magento/"
+printf 'COMPOSE_PROJECT_NAME=%s\nAPPLICATION_DOMAIN=bootstrap.magelens.test\n' "$project" > "$scratch/.env"
+(
+    cd "$scratch"
+    # Ignore a caller's project override so cleanup can only touch this test's volumes.
+    export COMPOSE_PROJECT_NAME="$project"
+    ./bin/expose-tools
+    source bin/common
+    for phase in fresh resumed; do
+        start_php_for_setup
+        # Use the real upstream CLI wrapper and the same non-root user as auth setup.
+        ./bin/clinotty php -r '
+            if (posix_geteuid() === 0) exit(1);
+            foreach (["/sock", "/var/www/.composer", "/bootstrap"] as $directory) {
+                if (fileowner($directory) !== posix_geteuid() || !is_writable($directory)) exit(1);
+            }
+            if (!@fsockopen("unix:///sock/phpfpm.sock")) exit(1);
+        '
+        ./bin/clinotty composer config --global cache-dir >/dev/null
+        [[ ! -e src/composer.json && ! -e src/app/etc/env.php ]]
+        echo "PASS: $phase install starts non-root PHP and the upstream Composer CLI before Magento exists."
+        dc stop -t 10 phpfpm
+    done
+)

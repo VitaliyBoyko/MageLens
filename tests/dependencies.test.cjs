@@ -138,6 +138,13 @@ if (args.includes('--print-viewer')) console.log('https://shop.magelens.test:608
     assert.equal(build.php, 'markoshust/magento-php:8.5-fpm-1');
     assert.ok(calls.indexOf(sync) < calls.indexOf(build));
     const auth = calls.find(call => call.args.includes('upstream-composer-auth'));
+    const volumeSetup = calls.find(call => call.args.includes('chown') && call.args.includes('/sock'));
+    const phpStart = calls.find(call => call.args.includes('up') && call.args.at(-1) === 'phpfpm');
+    assert.ok(volumeSetup && phpStart);
+    assert.ok(volumeSetup.args.includes('run') && volumeSetup.args.includes('--no-deps'));
+    assert.ok(calls.indexOf(volumeSetup) < calls.indexOf(phpStart), 'Socket ownership must be set before starting non-root PHP');
+    assert.ok(phpStart.args.includes('--wait'), 'Wait for the PHP socket before Composer authentication');
+    assert.ok(calls.indexOf(phpStart) < calls.indexOf(auth));
     const download = calls.find(call => call.args.includes('/application/docker/php/download-magento.sh'));
     const expose = calls.find(call => call.args.includes('run') && call.args.includes('workspace'));
     assert.ok(auth && download && expose);
