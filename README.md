@@ -76,7 +76,7 @@ Read the [coverage guide](docs/coverage.md) for report semantics, collection det
 
 MageLens extends the Compose services from the selected [Mark Shust Docker Magento](https://github.com/markshust/docker-magento) release with local mounts and coverage tooling. That release selects PHP, nginx, MariaDB, OpenSearch, and the cache service together. A separate image supplies the Cypress runner.
 
-Magento is installed through Composer. Its modules, framework, and themes live in `src/vendor/magento/`; client modules live in `src/app/code/`. Magento runs in developer mode with page and block caches disabled for coverage collection.
+Magento is installed through Composer. Its modules, framework, and themes live in `src/vendor/magento/`; client modules live in `src/app/code/`. Magento runs in developer mode, generating code and static assets on demand, with page and block caches disabled for coverage collection.
 
 Following Mark Shust's development setup, MageLens installs [DisableTwoFactorAuth](https://github.com/markshust/magento2-module-disabletwofactorauth) as a Composer development dependency and turns off Admin 2FA for this local environment. Cypress can sign in with the Admin username and password.
 

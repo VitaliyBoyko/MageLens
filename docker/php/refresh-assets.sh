@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd /var/www/html
-# Keep .htaccess; remove only generated assets and preprocessed view files.
+# Clear copied/instrumented assets; developer mode generates requested files on demand.
+# Keep .htaccess and the deployment version in pub/static.
 rm -rf pub/static/frontend pub/static/adminhtml var/view_preprocessed
 php bin/magento cache:clean
-configured_locales=$(php /application/docker/php/project.php locales)
-mapfile -t locales <<< "$configured_locales"
-php bin/magento setup:static-content:deploy -f --area frontend --area adminhtml "${locales[@]}"

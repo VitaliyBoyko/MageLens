@@ -16,9 +16,9 @@ Instrumentation uses disposable copies under `.runtime/app/`. Each run verifies 
 
 ## Run lifecycle
 
-Each run stops PHP-FPM, clears previous coverage artifacts, prepares instrumented source copies, starts the application, and refreshes static assets before Cypress runs. Installation and coverage share a lock, so run one command at a time.
+Each run stops PHP-FPM, clears previous coverage artifacts, prepares instrumented source copies, starts the application, and clears generated static assets before Cypress runs. Developer mode generates the requested JavaScript, CSS, and templates on demand. Installation and coverage share a lock, so run one command at a time.
 
-The suite temporarily uses Docker's internal `http://app:8000/` URL. Cleanup restores HTTPS on your selected domain, plain source copies, and static assets, including after test failures. Wait for the command to finish before browsing the application manually.
+The suite temporarily uses Docker's internal `http://app:8000/` URL. Cleanup restores HTTPS on your selected domain and plain source copies, then clears instrumented static assets, including after test failures. Wait for the command to finish before browsing the application manually.
 
 The combined report and badges are published after all tests pass and the coverage records and source checks succeed. Skipped or pending tests prevent publication. The README badge section is marked pending when collection starts.
 
