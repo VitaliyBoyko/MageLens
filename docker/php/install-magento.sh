@@ -5,6 +5,7 @@ cd /var/www/html
 as_app() { su -s /bin/bash app -c 'cd /var/www/html; exec "$@"' -- bash "$@"; }
 if [[ -f .magelens-imported ]]; then
     as_app composer install --prefer-dist --no-interaction --no-progress
+    as_app bash /application/docker/php/install-dev-tools.sh
     # Copied credentials must not make setup:upgrade connect to a remote shop.
     as_app php -r '
         if (is_file("app/etc/env.php")) {
@@ -34,8 +35,10 @@ if [[ -n "$modules" ]]; then
     mapfile -t new_modules <<< "$modules"
     as_app php bin/magento module:enable "${new_modules[@]}"
 fi
+as_app php bin/magento module:enable MarkShust_DisableTwoFactorAuth
 as_app php bin/magento setup:upgrade --keep-generated
 as_app php bin/magento deploy:mode:set developer
+as_app php bin/magento config:set twofactorauth/general/enable 0
 if [[ "$fresh" == yes ]]; then as_app php /application/docker/php/configure-theme.php; fi
 as_app bash /application/docker/php/base-url.sh
 as_app php bin/magento config:set web/url/redirect_to_base 0

@@ -78,6 +78,8 @@ MageLens extends the Compose services from the selected [Mark Shust Docker Magen
 
 Magento is installed through Composer. Its modules, framework, and themes live in `src/vendor/magento/`; client modules live in `src/app/code/`. Magento runs in developer mode with page and block caches disabled for coverage collection.
 
+Following Mark Shust's development setup, MageLens installs [DisableTwoFactorAuth](https://github.com/markshust/magento2-module-disabletwofactorauth) as a Composer development dependency and turns off Admin 2FA for this local environment. Cypress can sign in with the Admin username and password.
+
 ## Dependency versions
 
 Edit **[dependencies.yaml](dependencies.yaml)**, then rerun:
@@ -122,7 +124,7 @@ The installer enables newly discovered modules and preserves explicitly disabled
 
 ### Copy a complete Magento project
 
-Before the first installation, place your complete project in `src/`, including `composer.json`, `composer.lock`, `bin/magento`, and `app/bootstrap.php`. Remove the bundled example module and theme if you do not want them in your project. MageLens installs dependencies from your `composer.lock`. Provide credentials for any private Composer repositories your project uses.
+Before the first installation, place your complete project in `src/`, including `composer.json`, `composer.lock`, `bin/magento`, and `app/bootstrap.php`. Remove the bundled example module and theme if you do not want them in your project. MageLens installs dependencies from your `composer.lock` and adds the development 2FA module if it is missing. Provide credentials for any private Composer repositories your project uses.
 
 For a fresh local database, omit the copied `app/etc/env.php`. To use existing data, import your database into the local `db` service and configure `env.php` for the local services before running `./install.sh`. The database host must be `db`.
 
