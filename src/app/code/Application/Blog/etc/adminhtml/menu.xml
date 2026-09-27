@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+    <menu>
+        <add id="Application_Blog::manage" title="Blog" module="Application_Blog" sortOrder="90" resource="Application_Blog::manage"/>
+        <add id="Application_Blog::posts" title="Posts" module="Application_Blog" sortOrder="10" parent="Application_Blog::manage" action="application_blog/manage/index/section/posts" resource="Application_Blog::manage"/>
+        <add id="Application_Blog::categories" title="Categories" module="Application_Blog" sortOrder="20" parent="Application_Blog::manage" action="application_blog/manage/index/section/categories" resource="Application_Blog::manage"/>
+        <add id="Application_Blog::comments" title="Comments" module="Application_Blog" sortOrder="30" parent="Application_Blog::manage" action="application_blog/manage/index/section/comments" resource="Application_Blog::manage"/>
+    </menu>
+</config>

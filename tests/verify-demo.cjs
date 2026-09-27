@@ -1,0 +1,43 @@
+// Optional regression checks for the bundled demonstration suite.
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
+const php = read('coverage/php/coverage-summary.json');
+const js = read('coverage/js/coverage-summary.json');
+const templates = read('coverage/templates/coverage-summary.json');
+assert.ok(php.covered > 0 && php.covered < php.total);
+for (const route of ['/application_blog/manage/save/', '/blog/post/comment/']) {
+    assert.ok(php.requests.some(request => request.method === 'POST' && request.uri.includes(route)), `Missing real PHP POST collection: ${route}`);
+}
+if (php.collection === 'manifest') {
+    assert.ok(php.requests.every(request => request.mode === 'hit-only'), 'Expected validated native hit-only exports');
+    assert.ok(php.cache.hit > 0, 'The repeated GETs did not show native export cache reuse');
+}
+assert.ok(js.total.lines.covered > 0 && js.total.lines.covered < js.total.lines.total);
+for (const suffix of ['view/frontend/web/js/blog.js', 'view/adminhtml/web/js/editor.js', 'view/adminhtml/web/js/confirm-delete.js']) {
+    const file = Object.keys(js).find(file => file.endsWith('/Application/Blog/' + suffix));
+    assert.ok(file && js[file].lines.covered > 0, `Missing browser execution: ${suffix}`);
+}
+assert.ok(templates.records > 0 && templates.summary.covered > 0);
+assert.equal(templates.schemaVersion, 2);
+assert.ok(templates.lines.covered > 0 && templates.lines.covered < templates.lines.total);
+assert.ok(templates.statements.covered > 0 && templates.statements.covered < templates.statements.total);
+assert.ok(templates.templates.every(template => template.path.endsWith('.html')), 'PHP templates do not belong in the browser-template report');
+for (const suffix of ['web/template/list.html', 'web/template/details.html', 'web/template/theme-note.html', 'web/html/favorite.html', 'web/template/editor-preview.html']) {
+    assert.ok(templates.templates.some(t => t.path.endsWith(suffix) && t.status === 'observed'), `Missing DOM hit: ${suffix}`);
+}
+assert.ok(templates.templates.some(t => t.path.includes('app/design/') && t.status === 'observed'));
+assert.ok(templates.templates.some(t => t.path.endsWith('editorial-preview.html') && t.status === 'unobserved'));
+for (const suffix of ['web/template/list.html', 'web/template/details.html', 'web/template/theme-note.html', 'web/html/favorite.html', 'web/template/editor-preview.html']) {
+    const entry = templates.templates.find(template => template.path.endsWith(suffix));
+    assert.ok(entry.statementSummary.covered > 0, `Missing binding execution: ${suffix}`);
+    assert.ok(fs.statSync(`coverage/templates/files/${entry.id}.html`).size > 0);
+}
+assert.ok(templates.directories.some(directory => directory.path === 'app/code'));
+assert.ok(templates.directories.some(directory => directory.path === 'app/design'));
+assert.ok(templates.templates.find(template => template.path.endsWith('web/html/favorite.html')).statements.some(statement => statement.syntax === 'underscore:escape' && statement.hits > 0));
+const listTemplate = templates.templates.find(template => template.path.endsWith('web/template/list.html'));
+const unusedLine = listTemplate.source.split('\n').findIndex(line => line.includes('data-cy="unpublished-post"')) + 1;
+assert.equal(listTemplate.lineHits[unusedLine].hits, 0, 'A false conditional body must have zero binding evaluations');
+assert.equal(templates.templates.find(t => t.path.endsWith('editorial-preview.html')).statementSummary.covered, 0);
+console.log('Verified demo-specific execution and uncovered examples.');

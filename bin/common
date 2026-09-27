@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$ROOT"
+source "$ROOT/bin/dependencies"
+load_dependencies "$ROOT/dependencies.yaml"
+export LOCAL_UID=$(id -u) LOCAL_GID=$(id -g)
+dc() {
+    local php_image
+    # Read the selected release's PHP image before overriding that service with
+    # our PCOV build. All other service images are inherited directly by Compose.
+    php_image=$(docker compose --project-directory "$ROOT/.runtime/docker-magento/compose" \
+        -f "$ROOT/.runtime/docker-magento/compose/compose.yaml" config --images phpfpm) || return
+    local sources=()
+    [[ ! -f "$ROOT/.runtime/compose.sources.json" ]] || sources=(-f "$ROOT/.runtime/compose.sources.json")
+    MAGELENS_PHP_IMAGE="$php_image" docker compose --project-directory "$ROOT" -f "$ROOT/compose.yaml" "${sources[@]}" "$@"
+}
+say() { printf '\n==> %s\n' "$*"; }
+fail() { printf '\nError: %s\n' "$*" >&2; exit 1; }
+preflight() {
+    command -v docker >/dev/null || fail 'Install Docker with Compose v2.24.4 or newer, then rerun ./install.sh.'
+    docker info >/dev/null 2>&1 || fail 'Docker is unavailable. Start Docker and ensure your user can run docker info.'
+    local version
+    version=$(docker compose version --short | sed 's/^v//')
+    [[ "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]] || fail 'Cannot determine Docker Compose version.'
+    (( BASH_REMATCH[1] > 2 || (BASH_REMATCH[1] == 2 && (BASH_REMATCH[2] > 24 || (BASH_REMATCH[2] == 24 && BASH_REMATCH[3] >= 4))) )) || fail 'Docker Compose v2.24.4+ is required for upstream service overrides.'
+}
+lock_workflow() {
+    mkdir -p .runtime
+    mkdir .runtime/workflow.lock 2>/dev/null || fail 'Another install/coverage run is active. If interrupted, remove .runtime/workflow.lock after checking Docker.'
+    trap 'rmdir "$ROOT/.runtime/workflow.lock"' EXIT
+}

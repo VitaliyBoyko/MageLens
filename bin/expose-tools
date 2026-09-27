@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+source "$(dirname "$0")/common"
+upstream=.runtime/docker-magento/compose
+[[ -d "$upstream/bin" ]] || fail 'Pinned Docker Magento tools are missing. Run ./install.sh.'
+for file in "$upstream"/bin/*; do
+    name=$(basename "$file")
+    case "$name" in
+        application-compose|application-domain|badges.cjs|common|dependencies|expose-tools|finalize.cjs|install|prepare.cjs|project.cjs|report-browser.cjs|report-index.cjs|run-browser.cjs|run-coverage|sync-dependencies.cjs|wait-http.cjs)
+            fail "Upstream tool conflicts with application script: bin/$name" ;;
+    esac
+    cp -R "$file" bin/
+    chmod +x "bin/$name"
+done
+mkdir -p lib env
+cp -R "$upstream/lib/." lib/
+for file in "$upstream"/env/*; do
+    [[ -e "env/$(basename "$file")" ]] || cp "$file" env/
+done
+
+# Upstream commands use bin/docker-compose. Route them through this project's
+# pinned services instead of loading upstream development/healthcheck overlays.
+cat > bin/docker-compose <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+[[ "${1:-}" != --no-dev ]] || shift
+if [[ "${1:-}" == exec ]] && { [[ ! -t 0 ]] || [[ ! -t 1 ]]; }; then
+    shift
+    set -- exec -T "$@"
+fi
+exec ./bin/application-compose "$@"
+SCRIPT
+
+# Start the application services and the Cypress viewing desktop.
+cat > bin/start <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+[[ "${1:-}" != --no-dev ]] || shift
+[[ $# != 0 ]] || set -- db redis opensearch phpfpm app runner
+exec ./bin/application-compose up -d "$@"
+SCRIPT
+chmod +x bin/docker-compose bin/start

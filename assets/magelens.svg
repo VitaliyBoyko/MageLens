@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1200" role="img" aria-labelledby="title desc">
+  <title id="title">MageLens logo</title>
+  <desc id="desc">Magnifying glass with Magento-inspired mark and red, yellow, green coverage arcs.</desc>
+
+  <rect width="1200" height="1200" fill="#ffffff"/>
+
+  <!-- Magnifying glass -->
+  <circle cx="520" cy="470" r="280" fill="none" stroke="#202833" stroke-width="44"/>
+  <line x1="715" y1="665" x2="895" y2="845" stroke="#202833" stroke-width="70" stroke-linecap="round"/>
+
+  <!-- Coverage arcs -->
+  <path d="M 326 606 A 225 225 0 0 1 318 353"
+        fill="none" stroke="#ff2b2b" stroke-width="42" stroke-linecap="round"/>
+  <path d="M 372 290 A 225 225 0 0 1 668 292"
+        fill="none" stroke="#ffc400" stroke-width="42" stroke-linecap="round"/>
+  <path d="M 721 354 A 225 225 0 0 1 713 605"
+        fill="none" stroke="#00b85c" stroke-width="42" stroke-linecap="round"/>
+
+  <!-- Magento-inspired M mark -->
+  <path d="M 520 315
+           L 665 405
+           L 665 565
+           L 610 598
+           L 610 440
+           L 520 385
+           L 430 440
+           L 430 598
+           L 375 565
+           L 375 405
+           Z"
+        fill="#ff5a00"/>
+  <path d="M 475 455
+           L 520 430
+           L 565 455
+           L 565 630
+           L 520 658
+           L 475 630
+           Z"
+        fill="#ff5a00"/>
+  <path d="M 520 486
+           L 520 595"
+        stroke="#ffffff" stroke-width="26" stroke-linecap="round"/>
+
+  <!-- Wordmark -->
+  <text x="600" y="1035"
+        text-anchor="middle"
+        font-family="Inter, Arial, Helvetica, sans-serif"
+        font-size="150"
+        font-weight="700"
+        letter-spacing="-6">
+    <tspan fill="#202833">Mage</tspan><tspan fill="#ff5a00">Lens</tspan>
+  </text>
+</svg>

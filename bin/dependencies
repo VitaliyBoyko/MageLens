@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Deliberately accept only the documented flat YAML string mapping. No eval,
+# shell expansion, host YAML package, or bootstrapping container is needed.
+load_dependencies() {
+    local file=$1 line key value seen=' ' number=0 required
+    local double='^([A-Z][A-Z0-9_]*):[[:space:]]+"([a-zA-Z0-9_./:@+-]+)"[[:space:]]*(#.*)?$'
+    local single="^([A-Z][A-Z0-9_]*):[[:space:]]+'([a-zA-Z0-9_./:@+-]+)'[[:space:]]*(#.*)?$"
+    [[ -f "$file" ]] || { printf 'Missing dependency configuration: %s\n' "$file" >&2; return 1; }
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        number=$((number + 1))
+        line=${line%$'\r'}
+        [[ "$line" =~ ^[[:space:]]*(#.*)?$ ]] && continue
+        if [[ "$line" =~ $double || "$line" =~ $single ]]; then
+            key=${BASH_REMATCH[1]} value=${BASH_REMATCH[2]}
+        else
+            printf '%s:%s: expected KEY: "value" (a flat YAML string mapping).\n' "$file" "$number" >&2
+            return 1
+        fi
+        case "$key" in
+            MAGENTO_VERSION|MARKSHUST_DOCKER_MAGENTO_VERSION|PCOV_VERSION|PIE_VERSION|CYPRESS_VERSION|TEMPLATE_COVERAGE_VERSION)
+                [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]] || {
+                    printf '%s: %s must be an exact release version.\n' "$file" "$key" >&2; return 1;
+                } ;;
+            RUNNER_IMAGE)
+                [[ "$value" =~ ^[a-zA-Z0-9][a-zA-Z0-9./:_-]*:[a-zA-Z0-9_][a-zA-Z0-9_.-]*$ ]] || {
+                    printf '%s: %s must be an image:tag.\n' "$file" "$key" >&2; return 1;
+                } ;;
+            *) printf '%s: unknown dependency key %s.\n' "$file" "$key" >&2; return 1 ;;
+        esac
+        [[ "$seen" != *" $key "* ]] || { printf '%s: duplicate key %s.\n' "$file" "$key" >&2; return 1; }
+        seen+="$key "
+        export "$key=$value"
+    done < "$file"
+    for required in MAGENTO_VERSION MARKSHUST_DOCKER_MAGENTO_VERSION PCOV_VERSION PIE_VERSION CYPRESS_VERSION TEMPLATE_COVERAGE_VERSION RUNNER_IMAGE; do
+        [[ "$seen" == *" $required "* ]] || { printf '%s: missing dependency %s.\n' "$file" "$required" >&2; return 1; }
+    done
+}

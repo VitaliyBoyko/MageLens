@@ -1,0 +1,128 @@
+# Reuse upstream services; only local ports, mounts, and coverage tooling differ.
+services:
+  app:
+    extends:
+      file: .runtime/docker-magento/compose/compose.yaml
+      service: app
+    ports: !override
+      - "127.0.0.1:${APPLICATION_PORT:-80}:8000"
+      - "127.0.0.1:${APPLICATION_HTTPS_PORT:-443}:8443"
+      - "127.0.0.1:${CYPRESS_VIEW_PORT:-6080}:8444"
+    # Upstream SSL tools create their temporary certificate files here.
+    working_dir: /tmp
+    volumes: !override
+      - ./src:/var/www/html:ro
+      # Keep the installer's socket ownership when an empty volume is mounted.
+      - type: volume
+        source: sockdata
+        target: /sock
+        volume: {nocopy: true}
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ssldata:/etc/nginx/certs
+    depends_on: [phpfpm]
+  phpfpm:
+    extends:
+      file: .runtime/docker-magento/compose/compose.yaml
+      service: phpfpm
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      args:
+        APPLICATION_UID: ${LOCAL_UID:-1000}
+        APPLICATION_GID: ${LOCAL_GID:-1000}
+        PHP_IMAGE: ${MAGELENS_PHP_IMAGE:?Run commands through bin/application-compose or install.sh}
+        PCOV_VERSION: ${PCOV_VERSION:?Missing dependencies.yaml configuration}
+        PIE_VERSION: ${PIE_VERSION:?Missing dependencies.yaml configuration}
+    image: magelens-php:${MAGENTO_VERSION}-pcov${PCOV_VERSION}-markshust${MARKSHUST_DOCKER_MAGENTO_VERSION}
+    volumes: !override
+      - ./src:/var/www/html
+      - type: volume
+        source: sockdata
+        target: /sock
+        volume: {nocopy: true}
+      - ./coverage:/coverage
+      - ./.runtime/pcov:/pcov-state
+      - ./docker:/application/docker:ro
+      - ./patches/cypress:/cypress-patches:ro
+      - ./.runtime/magento:/bootstrap
+      - composerdata:/var/www/.composer
+    environment:
+      APPLICATION_DOMAIN: ${APPLICATION_DOMAIN:-magelens.test}
+      APPLICATION_HTTPS_PORT: ${APPLICATION_HTTPS_PORT:-443}
+      CYPRESS_VIEW_PORT: ${CYPRESS_VIEW_PORT:-6080}
+      APPLICATION_UID: ${LOCAL_UID:-1000}
+      APPLICATION_GID: ${LOCAL_GID:-1000}
+      MAGENTO_VERSION: ${MAGENTO_VERSION:?Missing dependencies.yaml configuration}
+  # Explicit install-only job; the old volume is retained for safe migration.
+  workspace:
+    extends:
+      service: phpfpm
+    profiles: [tools]
+    user: root
+    entrypoint: [bash, /application/docker/php/expose-source.sh]
+    volumes: !override
+      - appdata:/legacy:ro
+      - type: volume
+        source: sockdata
+        target: /sock
+        volume: {nocopy: true}
+      - ./src:/var/www/html
+      - ./docker:/application/docker:ro
+      - ./.runtime/magento:/bootstrap
+      - composerdata:/var/www/.composer
+  db:
+    extends:
+      file: .runtime/docker-magento/compose/compose.yaml
+      service: db
+    ports: !reset []
+    healthcheck:
+      test: ["CMD", "mariadb", "--host=127.0.0.1", "--user=magento", "--password=magento", "magento", "--execute=SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  redis:
+    extends:
+      file: .runtime/docker-magento/compose/compose.yaml
+      service: redis
+    ports: !reset []
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  opensearch:
+    extends:
+      file: .runtime/docker-magento/compose/compose.yaml
+      service: opensearch
+    ports: !reset []
+    environment:
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9200/_cluster/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  runner:
+    build:
+      context: .
+      dockerfile: docker/runner/Dockerfile
+      args:
+        RUNNER_IMAGE: ${RUNNER_IMAGE:?Missing dependencies.yaml configuration}
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    working_dir: /workspace
+    environment:
+      HOME: /tmp
+      CYPRESS_CACHE_FOLDER: /opt/cypress
+      CYPRESS_BASE_URL: http://app:8000
+    volumes:
+      - .:/workspace
+      - ./src:/source:ro
+      - node_modules:/workspace/node_modules
+    shm_size: 1gb
+volumes:
+  appdata:
+  sockdata:
+  dbdata:
+  node_modules:
+  composerdata:
+  ssldata:

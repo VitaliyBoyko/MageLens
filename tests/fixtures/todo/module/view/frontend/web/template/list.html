@@ -1,0 +1,12 @@
+<form data-bind="submit: add">
+    <input data-cy="todo-input" aria-label="New task" data-bind="value: draft, valueUpdate: 'input'">
+    <button data-cy="todo-add" type="submit">Add task</button>
+</form>
+<p data-cy="todo-empty" data-bind="visible: tasks().length === 0">No tasks yet</p>
+<ul data-bind="foreach: tasks">
+    <li data-cy="todo-item">
+        <input type="checkbox" aria-label="Completed" data-cy="todo-done" data-bind="checked: done">
+        <span data-cy="todo-label" data-bind="text: text, css: {completed: done}"></span>
+        <button type="button" data-cy="todo-remove" data-bind="click: $parent.remove.bind($parent)">Remove</button>
+    </li>
+</ul>

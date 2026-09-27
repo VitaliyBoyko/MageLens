@@ -1,0 +1,8 @@
+<aside data-cy="editor-preview" class="admin__fieldset" aria-label="Article preview">
+    <h2 data-bind="text: title() || 'Article preview'"></h2>
+    <p data-bind="text: summary"></p>
+    <p><span data-cy="word-count" data-bind="text: words"></span> words · <span data-bind="text: status"></span></p>
+    <!-- ko if: status() === 'draft' -->
+    <p data-cy="draft-notice" data-bind="i18n: 'Drafts are visible only in Admin.'"></p>
+    <!-- /ko -->
+</aside>

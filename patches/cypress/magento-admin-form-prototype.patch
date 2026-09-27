@@ -1,0 +1,28 @@
+Subject: Keep Admin change tracking on inputs with a different DOM prototype chain
+Target: Magento 2.4.8-p5 lib/web/mage/adminhtml/form.js
+
+Under Cypress, Admin inputs can belong to a different prototype chain from the
+one extended by Prototype. Call the same change-tracking implementation directly
+and use Prototype's static class helper. No validation or error is suppressed.
+Applied only during Cypress and reverted during cleanup.
+
+--- a/lib/web/mage/adminhtml/form.js
++++ b/lib/web/mage/adminhtml/form.js
+@@ -35,7 +35,7 @@
+         setHasChanges: function (element) {
+             var elm;
+ 
+-            if ($(element) && $(element).hasClassName('no-changes')) {
++            if ($(element) && Element.hasClassName(element, 'no-changes')) {
+                 return;
+             }
+             elm = element;
+@@ -100,7 +100,7 @@
+ 
+                 /* eslint-disable max-depth */
+                 if (!useCache || !varienWindowOnloadCache[dataElements[i].id]) {
+-                    Event.observe(dataElements[i], 'change', dataElements[i].setHasChanges.bind(dataElements[i]));
++                    Event.observe(dataElements[i], 'change', varienElementMethods.setHasChanges.bind(null, dataElements[i]));
+ 
+                     if (useCache) {
+                         varienWindowOnloadCache[dataElements[i].id] = true;

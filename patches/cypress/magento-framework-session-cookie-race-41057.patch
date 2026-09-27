@@ -1,0 +1,57 @@
+Subject: Follow regenerated sessions when a request starts with a stale cookie
+Upstream: https://github.com/magento/magento2/issues/41057
+Target: magento/framework 103.0.8-p5 (Magento 2.4.8-p5)
+
+Cypress CI-only workaround for the upstream session-cookie race; review on Magento upgrades.
+Applied only around Cypress runs by docker/php/cypress-patches.sh.
+Keep this patch out of composer.json so production installs do not receive it.
+Create the replacement ID before closing the old session so regenerateId() persists
+its forwarding pointer in the session a concurrent request is waiting to load. Follow
+one pointer before validation, and renew the response cookie with the adopted ID.
+
+--- a/vendor/magento/framework/Session/SessionManager.php
++++ b/vendor/magento/framework/Session/SessionManager.php
+@@ -179,12 +179,19 @@
+                 // Need to apply the config options so they can be ready by session_start
+                 $this->initIniOptions();
+                 $this->registerSaveHandler();
+-                if (isset($_SESSION['new_session_id'])) {
+-                    // Not fully expired yet. Could be lost cookie by unstable network.
++                session_start();
++
++                $newSessionId = null;
++                if (!empty($_SESSION['new_session_id'])
++                    && isset($_SESSION['destroyed'])
++                    && $_SESSION['new_session_id'] !== session_id()
++                ) {
++                    $newSessionId = $_SESSION['new_session_id'];
+                     session_commit();
+-                    session_id($_SESSION['new_session_id']);
++                    session_id($newSessionId);
++                    session_start();
+                 }
+-                session_start();
++
+                 if (isset($_SESSION['destroyed'])
+                     && $_SESSION['destroyed'] < time() - $this->sessionConfig->getCookieLifetime()
+                 ) {
+@@ -195 +202 @@
+-                $this->renewCookie(null);
++                $this->renewCookie($newSessionId);
+@@ -523,5 +530,4 @@
+         if ($this->isSessionExists()) {
+-            // Regenerate the session
+-            session_regenerate_id();
+-            $newSessionId = session_id();
++            $oldSession = $_SESSION;
++            $newSessionId = session_create_id();
+             $_SESSION['new_session_id'] = $newSessionId;
+@@ -535,3 +541,0 @@
+-            // Called after destroy()
+-            $oldSession = $_SESSION;
+-
+@@ -542,4 +545,0 @@
+-
+-            // New session does not need them
+-            unset($_SESSION['destroyed']);
+-            unset($_SESSION['new_session_id']);

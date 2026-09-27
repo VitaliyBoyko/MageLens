@@ -1,0 +1,17 @@
+& when (@media-common = true) {
+    .coverage-blog {
+        max-width: 820px;
+        margin: 0 auto;
+        article { border-bottom: 1px solid @border-color__base; padding: 24px 0; }
+        button { margin: 8px 8px 8px 0; }
+        .theme-note { border-left: 4px solid @link__color; background: @color-gray94; padding: 16px 20px; margin: 20px 0; }
+        .blog-filters { display: grid; gap: 8px; max-width: 540px; }
+        .blog-pagination { display: flex; align-items: center; gap: 16px; }
+        .blog-card-image { max-height: 220px; width: 100%; object-fit: cover; }
+        .blog-featured { width: 100%; max-height: 480px; object-fit: cover; }
+        .blog-summary { font-size: 1.2em; color: @color-gray40; }
+        .blog-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; }
+        form label { display: block; margin-top: 12px; }
+        .blog-honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+    }
+}

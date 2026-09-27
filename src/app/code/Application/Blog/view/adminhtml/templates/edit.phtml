@@ -1,0 +1,68 @@
+<?php
+/** @var \Application\Blog\Block\Adminhtml\Manage $block */
+$record = $block->record();
+$section = $block->section();
+$id = $block->recordId();
+$value = static fn(string $key, string $default = ''): string => is_scalar($record[$key] ?? $default) ? (string) ($record[$key] ?? $default) : $default;
+?>
+<div class="admin__scope-old" data-cy="blog-editor">
+    <p><a data-cy="admin-back" href="<?= $block->escapeUrl($block->actionUrl('index')) ?>">Back to <?= $block->escapeHtml($section) ?></a></p>
+    <form id="blog-edit" data-cy="admin-form" method="post" enctype="multipart/form-data" action="<?= $block->escapeUrl($block->actionUrl('save', ['id' => $id])) ?>">
+        <?= $block->getBlockHtml('formkey') ?>
+        <fieldset class="admin__fieldset">
+        <?php if ($section === 'posts'): ?>
+            <?php foreach (['title' => ['Title', 200], 'slug' => ['URL slug', 160], 'author' => ['Author', 120], 'excerpt' => ['Summary', 1000], 'body' => ['Article (plain text)', 100000], 'meta_title' => ['SEO title (optional)', 200], 'meta_description' => ['SEO description (optional)', 300]] as $name => [$label, $max]): ?>
+                <div class="admin__field">
+                    <label class="admin__field-label" for="blog-<?= $block->escapeHtmlAttr($name) ?>"><?= $block->escapeHtml($label) ?></label>
+                    <div class="admin__field-control">
+                    <?php if (in_array($name, ['body', 'excerpt', 'meta_description'], true)): ?>
+                        <textarea class="admin__control-textarea" id="blog-<?= $block->escapeHtmlAttr($name) ?>" name="<?= $block->escapeHtmlAttr($name) ?>" maxlength="<?= (int) $max ?>" <?= str_starts_with($name, 'meta_') ? '' : 'required' ?>><?= $block->escapeHtml($value($name)) ?></textarea>
+                    <?php else: ?>
+                        <input class="admin__control-text" id="blog-<?= $block->escapeHtmlAttr($name) ?>" name="<?= $block->escapeHtmlAttr($name) ?>" value="<?= $block->escapeHtmlAttr($value($name)) ?>" maxlength="<?= (int) $max ?>" <?= str_starts_with($name, 'meta_') ? '' : 'required' ?>/>
+                    <?php endif; ?>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+            <div class="admin__field"><label class="admin__field-label" for="blog-category">Category</label><div class="admin__field-control">
+                <select id="blog-category" name="category_id" class="admin__control-select" required>
+                    <option value="">Select a category</option>
+                    <?php foreach ($block->categories() as $category): ?><option value="<?= (int) $category['category_id'] ?>" <?= $value('category_id') === (string) $category['category_id'] ? 'selected' : '' ?>><?= $block->escapeHtml($category['name'] . ($category['is_active'] ? '' : ' (inactive)')) ?></option><?php endforeach; ?>
+                </select>
+            </div></div>
+            <div class="admin__field"><label class="admin__field-label" for="blog-status">Status</label><div class="admin__field-control">
+                <select id="blog-status" name="status" class="admin__control-select"><option value="draft" <?= $value('status') !== 'published' ? 'selected' : '' ?>>Draft</option><option value="published" <?= $value('status') === 'published' ? 'selected' : '' ?>>Published</option></select>
+            </div></div>
+            <div class="admin__field"><label class="admin__field-label" for="blog-date">Publish at (UTC)</label><div class="admin__field-control">
+                <input id="blog-date" type="datetime-local" name="published_at" value="<?= $block->escapeHtmlAttr(str_replace(' ', 'T', $value('published_at'))) ?>"/>
+                <p>Leave blank to publish immediately. Future dates schedule publication. Drafts and posts in inactive categories stay private.</p>
+            </div></div>
+            <div class="admin__field"><label class="admin__field-label" for="blog-image">Featured image</label><div class="admin__field-control">
+                <input id="blog-image" type="file" name="featured_image" accept="image/jpeg,image/png"/>
+                <p>JPG or PNG, up to 5 MB. Select an image again after a validation error.</p>
+                <?php if ($value('image')): ?><p data-cy="existing-image">Image saved: <?= $block->escapeHtml(basename($value('image'))) ?></p><label><input type="checkbox" name="remove_image" value="1"/> Remove current image</label><?php endif; ?>
+            </div></div>
+            <div data-bind="scope: 'blogEditor'"><!-- ko template: getTemplate() --><!-- /ko --></div>
+        <?php elseif ($section === 'categories'): ?>
+            <div class="admin__field"><label class="admin__field-label" for="category-name">Name</label><div class="admin__field-control"><input id="category-name" class="admin__control-text" name="name" value="<?= $block->escapeHtmlAttr($value('name')) ?>" maxlength="120" required/></div></div>
+            <div class="admin__field"><label class="admin__field-label" for="category-slug">URL slug</label><div class="admin__field-control"><input id="category-slug" class="admin__control-text" name="slug" value="<?= $block->escapeHtmlAttr($value('slug')) ?>" maxlength="120" required/></div></div>
+            <div class="admin__field"><label class="admin__field-label" for="category-active">Visibility</label><div class="admin__field-control"><select id="category-active" name="is_active"><option value="1" <?= $value('is_active', '1') === '1' ? 'selected' : '' ?>>Active</option><option value="0" <?= $value('is_active', '1') === '0' ? 'selected' : '' ?>>Inactive</option></select></div></div>
+        <?php else: ?>
+            <p>Post ID: <?= (int) $value('post_id') ?></p>
+            <p>From <?= $block->escapeHtml($value('name')) ?> (<?= $block->escapeHtml($value('email')) ?>)</p>
+            <blockquote data-cy="comment-content"><?= $block->escapeHtml($value('body')) ?></blockquote>
+            <label for="comment-status">Moderation status</label>
+            <select id="comment-status" name="status"><?php foreach (['pending', 'approved', 'rejected'] as $status): ?><option value="<?= $block->escapeHtmlAttr($status) ?>" <?= $value('status') === $status ? 'selected' : '' ?>><?= $block->escapeHtml(ucfirst($status)) ?></option><?php endforeach; ?></select>
+        <?php endif; ?>
+        </fieldset>
+        <button class="action-primary" data-cy="admin-save" type="submit">Save</button>
+    </form>
+    <?php if ($id): ?>
+        <form data-cy="admin-delete-form" method="post" action="<?= $block->escapeUrl($block->actionUrl('delete', ['id' => $id])) ?>" data-mage-init='{"Application_Blog/js/confirm-delete":{}}'>
+            <?= $block->getBlockHtml('formkey') ?>
+            <button type="submit" data-cy="admin-delete" disabled>Delete</button>
+        </form>
+    <?php endif; ?>
+</div>
+<?php if ($section === 'posts'): ?>
+<script type="text/x-magento-init">{"*":{"Magento_Ui/js/core/app":{"components":{"blogEditor":{"component":"Application_Blog/js/editor"}}}}}</script>
+<?php endif; ?>

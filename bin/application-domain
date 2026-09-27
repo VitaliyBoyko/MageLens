@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+configure_application_domain() {
+    local file=$1 requested=${2:-} saved domain temporary
+    saved=$(sed -n 's/^[[:space:]]*APPLICATION_DOMAIN[[:space:]]*=[[:space:]]*//p' "$file" | tail -n 1)
+    saved=${saved%$'\r'}
+    saved=${saved%% #*}
+    saved=${saved#\"}; saved=${saved%\"}
+    saved=${saved#\'}; saved=${saved%\'}
+    domain=${requested:-${APPLICATION_DOMAIN:-${saved:-magelens.test}}}
+    if [[ -z "$requested" && -z "${APPLICATION_DOMAIN:-}" && -z "$saved" && -t 0 ]]; then
+        read -r -p "Test domain [magelens.test]: " domain || return 1
+        domain=${domain:-magelens.test}
+    fi
+    domain=$(printf '%s' "$domain" | tr '[:upper:]' '[:lower:]')
+    if [[ ${#domain} -gt 253 || ! "$domain" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
+        printf 'Enter a domain name such as magelens.test, without a scheme, port, or path.\n' >&2
+        return 1
+    fi
+    temporary=$(mktemp "${file}.XXXXXX") || return 1
+    if ! cp -p "$file" "$temporary" || ! awk -v domain="$domain" '
+        /^[[:space:]]*APPLICATION_DOMAIN[[:space:]]*=/ { next }
+        { print }
+        END { print "APPLICATION_DOMAIN=" domain }
+    ' "$file" > "$temporary" || ! mv "$temporary" "$file"; then
+        rm -f "$temporary"
+        return 1
+    fi
+    export APPLICATION_DOMAIN="$domain"
+}

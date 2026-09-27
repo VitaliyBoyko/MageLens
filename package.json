@@ -1,0 +1,35 @@
+{
+  "name": "magelens",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Quickly bootstrap Magento with PHP, JavaScript, and HTML template code coverage",
+  "scripts": {
+    "cy:coverage": "./bin/run-coverage",
+    "test:integration": "node --test tests/*.test.cjs"
+  },
+  "devDependencies": {
+    "@cypress/code-coverage": "4.0.3",
+    "@vitaliiboiko/magento-template-coverage": "1.1.0",
+    "cypress": "16.1.0",
+    "istanbul-lib-coverage": "3.2.2",
+    "istanbul-lib-instrument": "6.0.3",
+    "nyc": "18.0.0"
+  },
+  "nyc": {
+    "include": [
+      "src/app/code/**/*.js",
+      "src/app/design/frontend/**/*.js",
+      "src/app/design/adminhtml/**/*.js"
+    ],
+    "exclude": [],
+    "report-dir": "coverage/js",
+    "reporter": [
+      "html",
+      "json",
+      "json-summary",
+      "text-summary"
+    ],
+    "instrument": false,
+    "sourceMap": false
+  }
+}

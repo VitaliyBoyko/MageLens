@@ -1,0 +1,39 @@
+<?php
+/** @var \Application\Blog\Block\Adminhtml\Manage $block */
+$list = $block->listing();
+$section = $block->section();
+?>
+<div data-cy="blog-admin" class="admin__scope-old">
+    <nav aria-label="Blog sections">
+        <?php foreach (['posts', 'categories', 'comments'] as $name): ?>
+            <a data-cy="admin-<?= $block->escapeHtmlAttr($name) ?>" href="<?= $block->escapeUrl($block->actionUrl('index', ['section' => $name])) ?>"><?= $block->escapeHtml(ucfirst($name)) ?></a> &nbsp;
+        <?php endforeach; ?>
+    </nav>
+    <form method="get" action="<?= $block->escapeUrl($block->actionUrl('index')) ?>">
+        <label for="blog-search">Search <?= $block->escapeHtml($section) ?></label>
+        <input id="blog-search" data-cy="admin-search" name="q" value="<?= $block->escapeHtmlAttr($block->query()) ?>" maxlength="200"/>
+        <button data-cy="admin-search-submit" type="submit">Search</button>
+        <?php if ($section !== 'comments'): ?>
+            <a class="action-primary" data-cy="admin-new" href="<?= $block->escapeUrl($block->actionUrl('edit')) ?>">Add <?= $block->escapeHtml($section === 'posts' ? 'post' : 'category') ?></a>
+        <?php endif; ?>
+    </form>
+    <p data-cy="admin-total"><?= (int) $list['total'] ?> records</p>
+    <table class="data-grid" data-cy="admin-grid">
+        <thead><tr><th class="data-grid-th">ID</th><th class="data-grid-th">Title / name</th><th class="data-grid-th">Status</th><th class="data-grid-th">Actions</th></tr></thead>
+        <tbody>
+        <?php foreach ($list['rows'] as $row): ?>
+            <tr data-cy="admin-row">
+                <td><?= (int) $row[$list['key']] ?></td>
+                <td><?= $block->escapeHtml($row[$list['label']]) ?><?php if ($section === 'comments'): ?><p><?= $block->escapeHtml(mb_substr($row['body'], 0, 150)) ?></p><?php endif; ?></td>
+                <td><?= $block->escapeHtml($section === 'categories' ? ($row['is_active'] ? 'Active' : 'Inactive') : $row['status']) ?></td>
+                <td><a data-cy="admin-edit" href="<?= $block->escapeUrl($block->actionUrl('edit', ['id' => $row[$list['key']]])) ?>"><?= $section === 'comments' ? 'Moderate' : 'Edit' ?></a></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    <?php if (!$list['rows']): ?><p>No records found.</p><?php endif; ?>
+    <p>Page <?= (int) $list['page'] ?> of <?= (int) $list['pages'] ?></p>
+    <?php foreach (['Previous' => $list['page'] - 1, 'Next' => $list['page'] + 1] as $label => $page): ?>
+        <?php if ($page >= 1 && $page <= $list['pages']): ?><a href="<?= $block->escapeUrl($block->actionUrl('index', ['p' => $page, 'q' => $block->query()])) ?>"><?= $block->escapeHtml($label) ?></a><?php endif; ?>
+    <?php endforeach; ?>
+</div>

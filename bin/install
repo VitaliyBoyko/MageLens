@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+source "$(dirname "$0")/common"
+preflight
+command -v git >/dev/null || fail 'Install Git, then rerun ./install.sh.'
+[[ $# -le 1 ]] || fail 'Usage: ./install.sh [domain]'
+lock_workflow
+if [[ ! -f .env ]]; then
+    printf 'COMPOSE_PROJECT_NAME=magelens\nAPPLICATION_PORT=80\nAPPLICATION_HTTPS_PORT=443\nCYPRESS_VIEW_PORT=6080\n' > .env
+fi
+source "$ROOT/bin/application-domain"
+configure_application_domain .env "${1:-}"
+UPSTREAM="refs/tags/$MARKSHUST_DOCKER_MAGENTO_VERSION"
+say "Acquiring Mark Shust Docker Magento $MARKSHUST_DOCKER_MAGENTO_VERSION from dependencies.yaml"
+if [[ ! -d .runtime/docker-magento/.git ]]; then
+    git init -q .runtime/docker-magento
+    git -C .runtime/docker-magento remote add origin https://github.com/markshust/docker-magento.git
+fi
+git -C .runtime/docker-magento fetch --depth 1 origin "$UPSTREAM"
+git -C .runtime/docker-magento checkout --detach FETCH_HEAD
+mkdir -p .runtime/pcov .runtime/magento coverage node_modules src
+say 'Exposing pinned Docker Magento bin tools and supporting files'
+"$ROOT/bin/expose-tools"
+say 'Synchronizing Cypress and template coverage versions and dependency locks'
+docker run --rm --pull always --user "$LOCAL_UID:$LOCAL_GID" \
+    --mount "type=bind,source=$ROOT,target=/workspace" --workdir /workspace \
+    --env CYPRESS_VERSION --env TEMPLATE_COVERAGE_VERSION --env npm_config_cache=/tmp/npm-cache \
+    --entrypoint node "$RUNNER_IMAGE" bin/sync-dependencies.cjs
+say 'Building PHP/PCOV and Cypress tooling'
+dc pull app db redis opensearch
+dc build --pull phpfpm runner
+# Docker initializes this dependencies volume from the image; refresh it on reruns too.
+dc run --rm --no-deps --user root runner chown -R "$LOCAL_UID:$LOCAL_GID" /workspace/node_modules
+dc run --rm --no-deps runner npm ci --ignore-scripts --no-audit --no-fund
+say 'Configuring Composer with the upstream Docker Magento tools'
+dc up -d phpfpm
+dc exec -T --user root phpfpm chown "$LOCAL_UID:$LOCAL_GID" /var/www/.composer /bootstrap
+"$ROOT/bin/setup-composer-auth"
+if [[ ! -f src/.magelens-imported && ( ! -f src/composer.json || -f src/.application-source-ready ) ]]; then
+    say 'Installing Magento Composer packages (core code stays in vendor/)'
+    "$ROOT/bin/clinotty" bash /application/docker/php/download-magento.sh
+fi
+dc stop -t 60 app phpfpm
+say 'Preparing local Magento source in src/ (preserving an existing installation)'
+dc run --rm --no-deps workspace
+dc run --rm --no-deps runner node bin/prepare.cjs --plain
+say 'Starting the dedicated Magento database and search services'
+dc up -d --wait --wait-timeout 180 db redis opensearch runner
+say 'Installing/configuring Magento and discovered custom modules'
+dc run --rm --no-deps --user root phpfpm bash /application/docker/php/install-magento.sh
+dc up -d --force-recreate phpfpm app
+say "Configuring $APPLICATION_DOMAIN with the upstream domain and SSL tools"
+"$ROOT/bin/setup-domain" "$APPLICATION_DOMAIN"
+dc up -d --wait --wait-timeout 180 db redis opensearch runner
+dc exec -T phpfpm bash /application/docker/php/base-url.sh
+dc exec -T phpfpm bash /application/docker/php/refresh-assets.sh
+dc exec -T runner cypress verify
+dc exec -T app curl --fail --silent --show-error --insecure --retry 30 --retry-connrefused \
+    --retry-delay 2 --max-time 5 --output /dev/null https://localhost:8443/
+touch .runtime/installed
+say "MageLens is ready. Open $(dc exec -T phpfpm bash /application/docker/php/base-url.sh --print)"
+say "Watch Cypress at $(dc exec -T phpfpm bash /application/docker/php/base-url.sh --print-viewer)"
+printf 'Run npm run cy:coverage (or ./bin/run-coverage; no host Node required).\n'

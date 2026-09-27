@@ -1,0 +1,6 @@
+<?php /** @var \Magento\Framework\View\Element\Template $block */ ?>
+<p data-cy="todo-theme-php"><?= $block->escapeHtml(__('A discovered custom theme')) ?></p>
+<div data-bind="scope: 'todoTheme'"><!-- ko template: getTemplate() --><!-- /ko --></div>
+<script type="text/x-magento-init">
+{"*":{"Magento_Ui/js/core/app":{"components":{"todoTheme":{"component":"uiComponent","template":"Magento_Theme/todo-note"}}}}}
+</script>

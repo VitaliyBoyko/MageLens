@@ -1,0 +1,37 @@
+<div class="coverage-blog">
+    <!-- ko template: 'Application_Blog/theme-note' --><!-- /ko -->
+    <form class="blog-filters" data-bind="submit: search">
+        <label for="blog-query">Search articles</label>
+        <input id="blog-query" data-cy="search" type="search" maxlength="200" data-bind="value: query, disable: busy"/>
+        <label for="blog-category">Category</label>
+        <select id="blog-category" data-cy="category" data-bind="value: category, options: categories, optionsText: 'name', optionsValue: 'slug', optionsCaption: 'All categories', disable: busy"></select>
+        <button data-cy="search-submit" type="submit" data-bind="disable: busy">Search</button>
+    </form>
+    <p role="status" data-cy="status" data-bind="text: busy() ? 'Loading…' : total() + ' articles'"></p>
+    <p role="alert" data-cy="load-error" data-bind="visible: message, text: message"></p>
+    <div role="status" data-bind="html: favoriteNotice"></div>
+    <!-- ko if: !busy() && !message() && total() === 0 -->
+    <p data-cy="empty" data-bind="i18n: 'No articles found. Try another search or category.'"></p>
+    <!-- /ko -->
+    <div data-bind="foreach: posts">
+        <article data-cy="post">
+            <!-- ko if: image_url --><img class="blog-card-image" data-bind="attr: {src: image_url, alt: title}"/><!-- /ko -->
+            <h2><a data-cy="read-post" data-bind="text: title, attr: {href: url}"></a></h2>
+            <p><span data-bind="text: category"></span> · <span data-bind="text: author"></span></p>
+            <p data-bind="text: excerpt"></p>
+            <button type="button" data-cy="details" data-bind="click: $parent.toggleDetails.bind($parent), attr: {'aria-expanded': $parent.expanded() === id ? 'true' : 'false'}">Quick read</button>
+            <button type="button" data-cy="favorite" data-bind="click: $parent.toggleFavorite.bind($parent), text: $parent.favorites().includes(id) ? 'Unfavorite' : 'Favorite'"></button>
+            <!-- ko if: $parent.expanded() === id -->
+            <!-- ko template: 'Application_Blog/details' --><!-- /ko -->
+            <!-- /ko -->
+            <!-- ko if: false -->
+            <p data-cy="unpublished-post" data-bind="text: title"></p>
+            <!-- /ko -->
+        </article>
+    </div>
+    <nav class="blog-pagination" aria-label="Article pages" data-bind="visible: pages() > 1">
+        <button data-cy="previous" data-bind="click: previous, disable: busy() || page() <= 1">Previous</button>
+        <span data-cy="page-number" data-bind="text: 'Page ' + page() + ' of ' + pages()"></span>
+        <button data-cy="next" data-bind="click: next, disable: busy() || page() >= pages()">Next</button>
+    </nav>
+</div>

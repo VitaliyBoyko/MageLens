@@ -1,0 +1,31 @@
+<?php
+/** @var \Magento\Framework\View\Element\Template $block */
+$view = $block->getData('view_model');
+$post = $view->current();
+?>
+<article class="coverage-blog blog-article" data-cy="article">
+    <a href="<?= $block->escapeUrl($block->getUrl('blog')) ?>">All articles</a>
+    <h1 data-cy="article-title"><?= $block->escapeHtml($post['title']) ?></h1>
+    <p>By <?= $block->escapeHtml($post['author']) ?> · <time datetime="<?= $block->escapeHtmlAttr($post['published_at']) ?>"><?= $block->escapeHtml(substr($post['published_at'], 0, 10)) ?></time> · <?= $block->escapeHtml($post['category']) ?></p>
+    <?php if ($post['image_url']): ?><img class="blog-featured" data-cy="featured-image" src="<?= $block->escapeUrl($post['image_url']) ?>" alt="<?= $block->escapeHtmlAttr($post['title']) ?>"/><?php endif; ?>
+    <p class="blog-summary"><?= $block->escapeHtml($post['excerpt']) ?></p>
+    <div class="blog-body" data-cy="article-body"><?= $block->escapeHtml($post['body']) ?></div>
+    <section aria-labelledby="blog-comments-title">
+        <h2 id="blog-comments-title">Reader comments</h2>
+        <?php $comments = $view->comments((int) $post['post_id']); ?>
+        <?php if (!$comments): ?><p data-cy="no-comments">Be the first to comment.</p><?php endif; ?>
+        <?php foreach ($comments as $comment): ?>
+            <article data-cy="approved-comment"><h3><?= $block->escapeHtml($comment['name']) ?></h3><p class="blog-body"><?= $block->escapeHtml($comment['body']) ?></p><time><?= $block->escapeHtml($comment['created_at']) ?></time></article>
+        <?php endforeach; ?>
+        <form data-cy="comment-form" method="post" action="<?= $block->escapeUrl($block->getUrl('blog/post/comment', ['slug' => $post['slug']])) ?>">
+            <?= $block->getBlockHtml('formkey') ?>
+            <h3>Join the conversation</h3>
+            <p>Comments appear after approval. Your email stays private.</p>
+            <label for="comment-name">Name</label><input id="comment-name" name="name" autocomplete="name" maxlength="120" required/>
+            <label for="comment-email">Email</label><input id="comment-email" name="email" type="email" autocomplete="email" maxlength="254" required/>
+            <label for="comment-body">Comment</label><textarea id="comment-body" name="body" maxlength="5000" required></textarea>
+            <div class="blog-honeypot" aria-hidden="true"><label for="comment-website">Leave this empty</label><input id="comment-website" name="website" tabindex="-1" autocomplete="off"/></div>
+            <button type="submit" class="action primary" data-cy="comment-submit">Submit for review</button>
+        </form>
+    </section>
+</article>

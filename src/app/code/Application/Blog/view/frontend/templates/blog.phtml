@@ -1,0 +1,14 @@
+<?php /** @var \Magento\Framework\View\Element\Template $block */ ?>
+<section data-cy="blog">
+    <p><?= $block->escapeHtml($block->getData('view_model')->introduction()) ?></p>
+    <div data-bind="scope: 'coverageBlog'">
+        <!-- ko template: getTemplate() --><!-- /ko -->
+    </div>
+</section>
+<script type="text/x-magento-init">
+{"*":{"Magento_Ui/js/core/app":{"components":{"coverageBlog":{
+    "component":"Application_Blog/js/blog",
+    "postsUrl": <?= /* @noEscape */ json_encode($block->getUrl('blog/index/posts'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+    "categories": <?= /* @noEscape */ json_encode($block->getData('view_model')->categories(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>
+}}}}}
+</script>
