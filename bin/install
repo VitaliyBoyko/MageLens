@@ -46,16 +46,17 @@ say 'Starting the dedicated Magento database and search services'
 start_dependencies
 say 'Installing/configuring Magento and discovered custom modules'
 dc run --rm --no-deps --user root phpfpm bash /application/docker/php/install-magento.sh
+dc run --rm --no-deps phpfpm php /application/docker/php/theme-scope.php > .runtime/active-themes.json
+dc exec -T runner node bin/prepare.cjs --runtime-only --theme-roots .runtime/active-themes.json
 dc up -d --force-recreate phpfpm app
-say "Configuring $APPLICATION_DOMAIN with the upstream domain and SSL tools"
+say "Configuring $APPLICATION_DOMAIN and its local SSL certificate"
 "$ROOT/bin/setup-domain" "$APPLICATION_DOMAIN"
 start_dependencies
-dc exec -T phpfpm bash /application/docker/php/base-url.sh
 dc exec -T phpfpm bash /application/docker/php/refresh-assets.sh
 dc exec -T runner cypress verify
-dc exec -T app curl --fail --silent --show-error --insecure --retry 30 --retry-connrefused \
-    --retry-delay 2 --max-time 5 --output /dev/null https://localhost:8443/
-touch .runtime/installed
+dc exec -T app sh -c 'curl --fail --silent --show-error --insecure --retry 30 --retry-connrefused \
+    --retry-delay 2 --max-time 5 --output /dev/null "https://localhost:$APPLICATION_HTTPS_PORT/"'
+printf '2\n' > .runtime/installed
 say "MageLens is ready. Open $(dc exec -T phpfpm bash /application/docker/php/base-url.sh --print)"
 say "Watch Cypress at $(dc exec -T phpfpm bash /application/docker/php/base-url.sh --print-viewer)"
 printf 'Run npm run cy:coverage (or ./bin/run-coverage; no host Node required).\n'

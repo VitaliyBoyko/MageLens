@@ -5,7 +5,7 @@ upstream=.runtime/docker-magento/compose
 for file in "$upstream"/bin/*; do
     name=$(basename "$file")
     case "$name" in
-        application-compose|application-domain|badges.cjs|common|dependencies|expose-tools|finalize.cjs|install|prepare.cjs|project.cjs|report-browser.cjs|report-index.cjs|run-browser.cjs|run-coverage|sync-dependencies.cjs|wait-http.cjs)
+        application-compose|application-domain|badges.cjs|common|dependencies|expose-tools|finalize.cjs|install|prepare.cjs|project.cjs|report-browser.cjs|report-index.cjs|run-browser.cjs|run-coverage|sync-dependencies.cjs)
             fail "Upstream tool conflicts with application script: bin/$name" ;;
     esac
     cp -R "$file" bin/
@@ -41,3 +41,18 @@ cd "$(dirname "$0")/.."
 exec ./bin/application-compose up -d "$@"
 SCRIPT
 chmod +x bin/docker-compose bin/start
+
+# Magento URLs are supplied by env.php. The domain helper only handles hosts
+# and delegates certificate creation to the pinned upstream SSL tool.
+cat > bin/setup-domain <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+domain=${1:?Please specify a domain name}
+if ! grep -qwF "$domain" /etc/hosts; then
+    echo 'Your system password is needed to add an entry to /etc/hosts...'
+    printf '127.0.0.1 ::1 %s\n' "$domain" | sudo tee -a /etc/hosts
+fi
+exec ./bin/setup-ssl "$domain"
+SCRIPT
+chmod +x bin/setup-domain

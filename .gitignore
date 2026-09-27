@@ -28,7 +28,6 @@
 !/bin/run-browser.cjs
 !/bin/run-coverage
 !/bin/sync-dependencies.cjs
-!/bin/wait-http.cjs
 /.env
 /rootCA.pem
 /policies.json

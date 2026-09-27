@@ -1,5 +1,14 @@
 # Release notes
 
+## 1.0.6 — 2026-09-27
+
+- Coverage runs reuse running services and unchanged browser instrumentation. They no longer restart containers, rewrite Magento configuration, or clear caches and static assets automatically.
+- Use `--start`, `--refresh-cache`, `--refresh-assets`, and `--restart-php` when needed. Options can be combined.
+- Coverage settings are explicit in `docker/php/env.php.sample` and merged into Magento's `env.php` during installation. HTML/PHTML and browser assets run without minification.
+- Cypress uses your configured HTTPS domain. Source edits and selected theme changes are picked up without restarting PHP.
+
+For an existing installation, rerun `./install.sh` once after updating, then use `./bin/run-coverage` as usual.
+
 ## 1.0.5 — 2026-09-27
 
 - The Cypress runner recovers after an interrupted container shutdown, including during installation's SSL restart.

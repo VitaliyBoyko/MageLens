@@ -106,7 +106,7 @@ test('installer uses changed YAML versions and the runner image throughout its w
     fs.writeFileSync(path.join(directory, '.runtime/docker-magento/compose/bin/status'), '#!/bin/sh\n');
     // Keep the upstream entry points in the installer contract; Docker is mocked below.
     fs.writeFileSync(path.join(directory, '.runtime/docker-magento/compose/bin/setup-composer-auth'), '#!/bin/sh\nexec docker upstream-composer-auth\n');
-    fs.writeFileSync(path.join(directory, '.runtime/docker-magento/compose/bin/setup-domain'), '#!/bin/sh\nexec docker upstream-domain "$@"\n');
+    fs.writeFileSync(path.join(directory, '.runtime/docker-magento/compose/bin/setup-ssl'), '#!/bin/sh\nexec docker upstream-domain "$@"\n');
     fs.writeFileSync(path.join(directory, '.runtime/docker-magento/compose/bin/clinotty'), '#!/bin/sh\nexec docker compose exec -T phpfpm "$@"\n');
     fs.writeFileSync(path.join(directory, '.runtime/docker-magento/compose/env/local.env'), 'TEST=1\n');
     const commands = path.join(directory, 'commands');
@@ -124,7 +124,7 @@ if (args.includes('--images')) console.log('markoshust/magento-php:8.5-fpm-1');
 if (args.includes('--print')) console.log('https://shop.magelens.test/');
 if (args.includes('--print-viewer')) console.log('https://shop.magelens.test:6080/');
 `;
-    for (const command of ['docker', 'git']) fs.writeFileSync(path.join(commands, command), script, {mode: 0o755});
+    for (const command of ['docker', 'git', 'sudo']) fs.writeFileSync(path.join(commands, command), script, {mode: 0o755});
     execFileSync('bash', ['install.sh', 'shop.magelens.test'], {cwd: directory, env: {...process.env, PATH: `${commands}:${process.env.PATH}`}, stdio: 'pipe'});
     const calls = fs.readFileSync(log, 'utf8').trim().split('\n').map(JSON.parse);
     assert.ok(calls.some(call => call.command === 'git' && call.args.includes('refs/tags/54.0.0')));
@@ -182,6 +182,8 @@ test('Compose inherits service images and PHP from the selected Mark Shust confi
     assert.equal(config.services.phpfpm.environment.APPLICATION_HTTPS_PORT, '443');
     assert.equal(config.services.phpfpm.environment.CYPRESS_VIEW_PORT, '6080');
     assert.deepEqual(config.services.app.ports.map(port => [port.host_ip, port.published, port.target]),
-        [['127.0.0.1', '80', 8000], ['127.0.0.1', '443', 8443], ['127.0.0.1', '6080', 8444]]);
+        [['127.0.0.1', '80', 80], ['127.0.0.1', '443', 443], ['127.0.0.1', '6080', 6080]]);
+    assert.ok(config.services.app.networks.default.aliases.includes('magelens.test'));
+    assert.equal(config.services.runner.environment.CYPRESS_BASE_URL, 'https://magelens.test:443');
     assert.equal(config.services.runner.build.args.RUNNER_IMAGE, configured('RUNNER_IMAGE'));
 });

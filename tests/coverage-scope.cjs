@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const {execFileSync} = require('node:child_process');
 
 if (process.argv[2] === 'browser') {
-    execFileSync('node', ['bin/prepare.cjs'], {stdio: 'inherit'});
+    execFileSync('node', ['bin/prepare.cjs', '--theme-roots', 'themes.json'], {stdio: 'inherit'});
     const context = {window: {}};
     vm.runInNewContext(fs.readFileSync('.runtime/app/code/Magento/Local/view/frontend/requirejs-config.js', 'utf8'), context);
     fs.mkdirSync('.nyc_output', {recursive: true});
@@ -21,10 +21,12 @@ if (process.argv[2] === 'browser') {
         assert.equal(metric.lines.covered > 0, file.endsWith('requirejs-config.js'));
     }
     assert.ok(!Object.keys(js).some(file => file.includes('/vendor/')));
+    assert.ok(!Object.keys(js).some(file => file.includes('/inactive/')));
     const templates = JSON.parse(fs.readFileSync('coverage/templates/coverage-summary.json')).templates;
     assert.ok(templates.some(file => file.path === 'app/code/Magento/Local/view/frontend/web/template/example.html'));
     assert.ok(templates.some(file => file.path === 'app/design/frontend/Magento/local/web/template/example.html'));
     assert.ok(!templates.some(file => file.path.includes('vendor/')));
+    assert.ok(!templates.some(file => file.path.includes('/inactive/')));
     console.log('PASS: Magento namespace, JS outside web/js, tests, and unvisited templates reach browser reports.');
     process.exit(0);
 }
@@ -37,20 +39,24 @@ const put = (file, contents) => {
 };
 try {
     const config = JSON.parse(execFileSync('bash', ['bin/application-compose', 'config', '--format', 'json'], {cwd: root, encoding: 'utf8'}));
-    for (const file of ['bin', 'package.json', 'README.md']) fs.cpSync(`${root}/${file}`, `${scratch}/${file}`, {recursive: true});
+    for (const file of ['bin', 'package.json', 'package-lock.json', 'README.md']) fs.cpSync(`${root}/${file}`, `${scratch}/${file}`, {recursive: true});
     for (const file of ['app/code/root.php', 'app/code/Magento/Local/registration.php',
         'app/code/Magento/Local/Setup/Upgrade.php', 'app/code/Magento/Local/Test/Example.php',
-        'app/design/frontend/Magento/local/templates/example.phtml', 'vendor/magento/example/vendor.php']) {
+        'app/design/frontend/Magento/local/templates/example.phtml', 'app/design/frontend/Magento/inactive/templates/example.phtml',
+        'vendor/magento/example/vendor.php']) {
         put(`src/${file}`, '<?php $scopeExample = 42;\n');
     }
     for (const file of ['app/code/root.js', 'app/code/Magento/Local/Test/example.cy.js',
         'app/code/Magento/Local/view/frontend/requirejs-config.js', 'app/design/frontend/Magento/local/web/js/theme.js',
-        'vendor/magento/example/vendor.js']) put(`src/${file}`, 'var config = {example: true};\n');
+        'app/design/frontend/Magento/inactive/web/js/theme.js', 'vendor/magento/example/vendor.js']) put(`src/${file}`, 'var config = {example: true};\n');
     for (const file of ['app/code/Magento/Local/view/frontend/web/template/example.html',
-        'app/design/frontend/Magento/local/web/template/example.html', 'vendor/magento/example/vendor.html']) {
+        'app/design/frontend/Magento/local/web/template/example.html', 'app/design/frontend/Magento/inactive/web/template/example.html',
+        'vendor/magento/example/vendor.html']) {
         put(`src/${file}`, '<span data-bind="text: label">Example</span>\n');
     }
     for (const file of ['composer.json', 'composer.lock']) put(`src/${file}`, '{}');
+    put('themes.json', JSON.stringify(['app/design/frontend/Magento/local']));
+    for (const theme of ['local', 'inactive']) put(`src/app/design/frontend/Magento/${theme}/theme.xml`, '<theme/>');
     for (const file of ['app/etc/config.php', 'app/etc/env.php']) put(`src/${file}`, '<?php return [];');
     const run = args => execFileSync('docker', ['run', '--rm', '--user', `${process.getuid()}:${process.getgid()}`, ...args], {stdio: 'inherit'});
     const bind = (source, target) => ['--mount', `type=bind,source=${source},target=${target}`];

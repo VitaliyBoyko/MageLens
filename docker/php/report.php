@@ -2,6 +2,8 @@
 declare(strict_types=1);
 require '/opt/report/vendor/autoload.php';
 require __DIR__ . '/manifest.php';
+require __DIR__ . '/collection.php';
+stopCoverageCollection();
 
 use SebastianBergmann\CodeCoverage\CodeCoverage;
 use SebastianBergmann\CodeCoverage\Filter;

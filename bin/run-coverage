@@ -1,44 +1,83 @@
 #!/usr/bin/env bash
 source "$(dirname "$0")/common"
+start_services=0
+refresh_cache=0
+refresh_assets=0
+restart_php=0
+for option in "$@"; do
+    case "$option" in
+        --start) start_services=1 ;;
+        --refresh-cache) refresh_cache=1 ;;
+        --refresh-assets) refresh_assets=1 ;;
+        --restart-php) restart_php=1 ;;
+        --help|-h)
+            cat <<'HELP'
+Usage: ./bin/run-coverage [options]
+
+Run the full Cypress suite and create fresh coverage reports using the running environment.
+
+  --start           Start stopped application services before the run
+  --refresh-cache   Clean Magento caches (for example after layout/config changes)
+  --refresh-assets  Clear published static assets and Magento caches
+  --restart-php     Restart PHP-FPM before the run
+  --help            Show this help
+
+Source edits and theme selections are picked up automatically. Options can be combined.
+HELP
+            exit 0 ;;
+        *) fail "Unknown option: $option. Use --help for available refresh options." ;;
+    esac
+done
 preflight
 [[ -f .runtime/installed ]] || fail 'Run ./install.sh first.'
-[[ $# == 0 ]] || fail 'This command always runs the full suite. It does not accept spec filters.'
+[[ "$(cat .runtime/installed)" == 2 ]] || fail 'Rerun ./install.sh once to update the coverage runtime.'
 lock_workflow
+if (( start_services )); then
+    if ! dc up -d --wait --wait-timeout 180 db redis opensearch phpfpm app runner; then
+        dc logs --tail 80 db redis opensearch phpfpm app runner >&2 || true
+        fail 'A required service could not start. See its logs above.'
+    fi
+fi
+if (( restart_php )); then
+    dc restart -t 60 phpfpm
+    dc up -d --wait --wait-timeout 60 phpfpm
+fi
+dc exec -T runner true || fail 'The Cypress runner is stopped. Use ./bin/run-coverage --start.'
+dc exec -T phpfpm php /application/docker/php/collection.php stop || fail 'Cannot prepare PHP collection. If services are stopped, use --start.'
+cleanup_hooks() {
+    if [[ -f .runtime/hooks-active ]]; then
+        dc exec -T phpfpm php /application/docker/php/project-hooks.php cleanup || return
+        rm -f .runtime/hooks-active
+    fi
+}
 cleanup() {
     local result=$?
     trap - EXIT
-    dc run --rm --no-deps runner rm -f coverage/.active-run >/dev/null 2>&1 || true
-    dc stop -t 60 phpfpm >/dev/null 2>&1 || result=1
-    dc run --rm --no-deps phpfpm php /application/docker/php/project-hooks.php cleanup || result=1
-    dc run --rm --no-deps runner node bin/prepare.cjs --plain >/dev/null || result=1
-    dc run --rm --no-deps phpfpm bash /application/docker/php/base-url.sh >/dev/null || result=1
-    dc run --rm --no-deps phpfpm bash /application/docker/php/refresh-assets.sh >/dev/null || result=1
-    dc start phpfpm >/dev/null 2>&1 || true
+    if [[ -f coverage/.active-run ]]; then
+        dc exec -T phpfpm php /application/docker/php/collection.php stop || result=1
+    fi
+    cleanup_hooks || result=1
     rmdir "$ROOT/.runtime/workflow.lock"
     exit "$result"
 }
 trap cleanup EXIT
-say 'Starting dependencies; draining old PHP requests before clearing artifacts'
-start_dependencies
-dc stop -t 60 phpfpm
-dc run --rm --no-deps phpfpm php /application/docker/php/project-hooks.php cleanup
-say 'Creating a new run, disposable template copies, and instrumented JavaScript'
-dc run --rm --no-deps runner node bin/prepare.cjs --plain
-dc run --rm --no-deps phpfpm php /application/docker/php/theme-scope.php > .runtime/active-themes.json
-dc run --rm --no-deps runner node bin/prepare.cjs --theme-roots .runtime/active-themes.json
-dc run --rm --no-deps phpfpm php /application/docker/php/project-hooks.php before
-dc run --rm --no-deps phpfpm bash /application/docker/php/base-url.sh http://app:8000/
-dc up -d phpfpm app
-dc exec -T phpfpm bash /application/docker/php/refresh-assets.sh
-dc run --rm --no-deps runner node bin/wait-http.cjs
+cleanup_hooks
+if (( refresh_assets )); then
+    dc exec -T phpfpm bash /application/docker/php/refresh-assets.sh
+elif (( refresh_cache )); then
+    dc exec -T phpfpm php bin/magento cache:clean
+fi
+say 'Preparing fresh coverage'
+dc exec -T phpfpm php /application/docker/php/theme-scope.php > .runtime/active-themes.json
+dc exec -T runner node bin/prepare.cjs --theme-roots .runtime/active-themes.json
+touch .runtime/hooks-active
+dc exec -T phpfpm php /application/docker/php/project-hooks.php before
 dc exec -T phpfpm php /application/docker/php/project-hooks.php prepare > coverage/project-fixtures.json
-dc exec -T --user "$LOCAL_UID:$LOCAL_GID" phpfpm php /application/docker/php/manifest.php
-say 'Running the project Cypress suite with all three collectors'
-say "Watch Cypress at $(dc exec -T phpfpm bash /application/docker/php/base-url.sh --print-viewer)"
+dc exec -T phpfpm php /application/docker/php/manifest.php
+dc exec -T phpfpm php /application/docker/php/collection.php start
+say "Running the full Cypress suite (preparation: ${SECONDS}s)"
 dc exec -T runner node bin/run-browser.cjs
-say 'Draining PHP-FPM so all native request exports are complete'
-dc stop -t 60 phpfpm
-dc run --rm --no-deps --user "$LOCAL_UID:$LOCAL_GID" phpfpm php /application/docker/php/report.php
-dc run --rm --no-deps runner node bin/report-browser.cjs
-dc run --rm --no-deps runner node bin/finalize.cjs
+say 'Generating coverage reports'
+dc exec -T phpfpm php /application/docker/php/report.php
+dc exec -T runner sh -c 'node bin/report-browser.cjs && node bin/finalize.cjs'
 say 'Open coverage/index.html for the combined report'

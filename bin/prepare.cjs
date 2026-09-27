@@ -1,54 +1,69 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const {createHash, randomBytes} = require('node:crypto');
-const {execFileSync} = require('node:child_process');
 const {setBadgeSection} = require('./badges.cjs');
-const {discover, files, writeRuntime, withThemeRoots} = require('./project.cjs');
-function sourceHashes(roots) {
-    return Object.fromEntries(applicationFiles(roots).map(file => [file, createHash('sha256').update(fs.readFileSync(file)).digest('hex')]));
-}
+const {discover, files, writeRuntime, writeChanged, nginxConfig, withThemeRoots} = require('./project.cjs');
+const digest = value => createHash('sha256').update(value).digest('hex');
+const browserFile = file => /\.(js|html)$/.test(file);
+
 function applicationFiles(roots = discover().roots) {
     return roots.flatMap(root => files(`src/${root}`));
 }
 
-if (require.main === module) {
+function sourceHashes(roots) {
+    return Object.fromEntries(applicationFiles(roots).map(file => [file, digest(fs.readFileSync(file))]));
+}
+
+function runtimeHashes(roots) {
+    return Object.fromEntries(roots.flatMap(root => fs.existsSync(`.runtime/${root}`) ? files(`.runtime/${root}`) : [])
+        .map(file => [`src/${path.relative('.runtime', file)}`, digest(fs.readFileSync(file))]));
+}
+
+function prepare({plain = false, runtimeOnly = false, themeRoots} = {}) {
     const discovered = discover();
-    const themeOption = process.argv.indexOf('--theme-roots');
-    const project = themeOption < 0 ? discovered : withThemeRoots(discovered, JSON.parse(fs.readFileSync(process.argv[themeOption + 1], 'utf8')));
-    sourceHashes(); // Reject unsupported sources before modifying runtime copies.
-    // Preserve bind-mount directory inodes; replace their contents instead.
-    for (const root of discovered.roots) {
-        const target = `.runtime/${root}`;
-        fs.mkdirSync(target, {recursive: true});
-        for (const name of fs.readdirSync(target)) fs.rmSync(`${target}/${name}`, {recursive: true, force: true});
-        fs.cpSync(`src/${root}`, target, {recursive: true});
+    const project = themeRoots === undefined ? discovered : withThemeRoots(discovered, themeRoots);
+    const inputs = sourceHashes(discovered.roots); // Reject symlinks before changing copies.
+    const before = runtimeHashes(discovered.roots);
+    const scoped = file => project.roots.some(root => file.startsWith(`src/${root}/`));
+    const selectedBrowser = Object.keys(inputs).filter(file => scoped(file) && browserFile(file));
+    const cachePath = '.runtime/instrumentation.json';
+    const cache = fs.existsSync(cachePath) ? JSON.parse(fs.readFileSync(cachePath)) : null;
+    const signature = digest(JSON.stringify({roots: project.roots,
+        sources: selectedBrowser.map(file => [file, inputs[file]]),
+        tools: [__filename, require.resolve('./project.cjs'), 'package-lock.json'].map(file => digest(fs.readFileSync(file)))}));
+    const reuse = !plain && cache?.signature === signature
+        && fs.existsSync('.runtime/template-manifest.json') && fs.existsSync('.runtime/js-baseline.json')
+        && selectedBrowser.every(file => before[file] === cache.outputs[file]);
+    if (!plain && !runtimeOnly && cache && JSON.stringify(cache.mountRoots) !== JSON.stringify(discovered.roots)) {
+        throw new Error('Source mount directories changed. Run ./install.sh before running coverage.');
     }
-    // Keep mount directories stable when switching the selected theme or restoring plain copies.
-    writeRuntime(project, discovered.roots);
-    if (!process.argv.includes('--plain')) {
-        const {createInstrumenter} = require('istanbul-lib-instrument');
-        fs.mkdirSync('coverage', {recursive: true});
-        for (const name of fs.readdirSync('coverage')) fs.rmSync(`coverage/${name}`, {recursive: true, force: true});
-        for (const directory of ['.nyc_output', 'cypress/screenshots', 'cypress/videos']) {
-            fs.rmSync(directory, {recursive: true, force: true});
+    for (const root of discovered.roots) fs.mkdirSync(`.runtime/${root}`, {recursive: true});
+    for (const file of Object.keys(before)) {
+        if (!(file in inputs)) fs.rmSync(path.join('.runtime', path.relative('src', file)));
+    }
+    for (const [file, hash] of Object.entries(inputs)) {
+        const expected = reuse && scoped(file) && browserFile(file) ? cache.outputs[file] : hash;
+        if (before[file] !== expected) {
+            const target = path.join('.runtime', path.relative('src', file));
+            fs.mkdirSync(path.dirname(target), {recursive: true});
+            fs.copyFileSync(file, target);
         }
-        fs.mkdirSync('coverage/raw/templates', {recursive: true});
-        const run = {id: randomBytes(16).toString('hex'), startedAt: new Date().toISOString(), roots: project.roots, sources: sourceHashes(project.roots)};
-        fs.mkdirSync(`coverage/raw/php/${run.id}`, {recursive: true, mode: 0o777});
-        fs.chmodSync(`coverage/raw/php/${run.id}`, 0o777); // FPM's app user may differ from the host UID.
-        fs.writeFileSync('coverage/run.json', JSON.stringify(run, null, 2));
-        fs.writeFileSync('coverage/.active-run', run.id);
-        setBadgeSection('Coverage has not completed for the current run.');
-        const cli = 'node_modules/.bin/magento-template-coverage';
-        // Scope by source location, with no namespace or module-name exclusions.
-        const roots = project.roots;
-        if (!roots.length) throw new Error('No source found in src/app/code or src/app/design');
-        execFileSync(cli, ['inventory', '--source', '/source', '--manifest', 'coverage/template-manifest.json',
-            ...roots.flatMap(root => ['--root', root])], {stdio: 'inherit'});
-        execFileSync(cli, ['instrument', '--source', '/source', '--manifest', 'coverage/template-manifest.json',
-            ...roots.flatMap(root => ['--map', `${root}=/workspace/.runtime/${root}`])], {stdio: 'inherit'});
+    }
+    writeRuntime(project, discovered.roots);
+    if (fs.existsSync('docker/nginx.conf')) writeChanged('.runtime/nginx.conf', nginxConfig(fs.readFileSync('docker/nginx.conf', 'utf8')));
+    if (plain) {
+        fs.rmSync(cachePath, {force: true});
+        return;
+    }
+    if (!project.roots.length) throw new Error('No source found in src/app/code or selected themes');
+    if (!reuse) {
+        const {createInstrumenter} = require('istanbul-lib-instrument');
+        const {createManifest, instrument} = require('@vitaliiboiko/magento-template-coverage');
+        const manifest = createManifest({source: 'src', roots: project.roots});
+        instrument({source: 'src', manifest, mappings: Object.fromEntries(project.roots.map(root => [root, `.runtime/${root}`]))});
+        fs.writeFileSync('.runtime/template-manifest.json', JSON.stringify(manifest, null, 2));
         const baseline = {};
-        for (const file of applicationFiles(project.roots).filter(file => file.endsWith('.js'))) {
+        for (const file of selectedBrowser.filter(file => file.endsWith('.js'))) {
             const instrumenter = createInstrumenter({compact: false, preserveComments: true,
                 coverageGlobalScope: 'window', coverageGlobalScopeFunc: false});
             const instrumented = instrumenter.instrumentSync(fs.readFileSync(file, 'utf8'), path.resolve(file));
@@ -56,7 +71,31 @@ if (require.main === module) {
             baseline[path.resolve(file)] = instrumenter.lastFileCoverage();
         }
         fs.writeFileSync('.runtime/js-baseline.json', JSON.stringify(baseline));
-        console.log(`Prepared fresh coverage run ${run.id}; originals unchanged.`);
     }
+    const after = runtimeHashes(discovered.roots);
+    fs.writeFileSync(cachePath, JSON.stringify({signature, mountRoots: discovered.roots,
+        outputs: Object.fromEntries(selectedBrowser.map(file => [file, after[file]]))}));
+    console.log(reuse ? 'Reusing unchanged browser instrumentation.' : 'Prepared browser instrumentation.');
+    if (runtimeOnly) return;
+
+    fs.mkdirSync('coverage', {recursive: true});
+    for (const name of fs.readdirSync('coverage')) fs.rmSync(`coverage/${name}`, {recursive: true, force: true});
+    for (const directory of ['.nyc_output', 'cypress/screenshots', 'cypress/videos']) fs.rmSync(directory, {recursive: true, force: true});
+    fs.mkdirSync('coverage/raw/templates', {recursive: true});
+    const run = {id: randomBytes(16).toString('hex'), startedAt: new Date().toISOString(), roots: project.roots,
+        sources: Object.fromEntries(Object.entries(inputs).filter(([file]) => scoped(file)))};
+    fs.mkdirSync(`coverage/raw/php/${run.id}`, {recursive: true, mode: 0o777});
+    fs.chmodSync(`coverage/raw/php/${run.id}`, 0o777);
+    fs.writeFileSync('coverage/run.json', JSON.stringify(run, null, 2));
+    fs.copyFileSync('.runtime/template-manifest.json', 'coverage/template-manifest.json');
+    setBadgeSection('Coverage has not completed for the current run.');
+    console.log(`Prepared fresh coverage run ${run.id}.`);
+    if (process.env.APPLICATION_DOMAIN) console.log(`Watch Cypress at https://${process.env.APPLICATION_DOMAIN}:${process.env.CYPRESS_VIEW_PORT || 6080}/`);
 }
-module.exports = {sourceHashes};
+
+if (require.main === module) {
+    const themeOption = process.argv.indexOf('--theme-roots');
+    prepare({plain: process.argv.includes('--plain'), runtimeOnly: process.argv.includes('--runtime-only'),
+        themeRoots: themeOption < 0 ? undefined : JSON.parse(fs.readFileSync(process.argv[themeOption + 1], 'utf8'))});
+}
+module.exports = {sourceHashes, prepare};

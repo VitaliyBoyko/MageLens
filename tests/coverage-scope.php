@@ -31,10 +31,15 @@ file_put_contents($source, $original);
 pcov\start();
 require '/var/www/html/app/code/Magento/Local/registration.php';
 require '/var/www/html/vendor/magento/example/vendor.php';
+require '/var/www/html/app/design/frontend/Magento/inactive/templates/example.phtml';
 pcov\stop();
-$hits = pcov\collect();
+check(isset(pcov\collect()['/var/www/html/app/design/frontend/Magento/inactive/templates/example.phtml']), 'Stable startup scope must permit a later theme switch');
+$export = '/tmp/scoped-export.pcov';
+check(pcov\export($export, null, $identity, pcov\inclusive, $scope) !== false, 'Scoped native export failed');
+$hits = pcov_record_load($export)['records'];
 check(in_array(1, $hits['/var/www/html/app/code/Magento/Local/registration.php'] ?? [], true), 'Registration execution is missing');
 check(!isset($hits['/var/www/html/vendor/magento/example/vendor.php']), 'Vendor execution leaked into coverage');
+check(!isset($hits['/var/www/html/app/design/frontend/Magento/inactive/templates/example.phtml']), 'Inactive theme execution leaked into coverage');
 
 $filter = new SebastianBergmann\CodeCoverage\Filter;
 foreach ($scope as $file) $filter->includeFile($file);

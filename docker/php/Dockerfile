@@ -20,6 +20,7 @@ COPY docker/php/composer.json docker/php/composer.lock ./
 RUN composer install --no-dev --prefer-dist --no-interaction --no-progress
 COPY docker/php/coverage.ini /usr/local/etc/php/conf.d/zz-application-coverage.ini
 COPY docker/php/collect.php /opt/application/collect.php
+COPY docker/php/collection.php /opt/application/collection.php
 # Upstream's main FPM config does not include php-fpm.d/*.conf.
 # The private socket volume is shared with nginx's upstream UID.
 RUN printf '\nphp_admin_value[auto_prepend_file] = /opt/application/collect.php\npm = static\npm.max_children = 1\nlisten.mode = 0666\n' >> /usr/local/etc/php-fpm.conf

@@ -7,8 +7,11 @@ $token = $_SERVER['HTTP_X_APPLICATION_COVERAGE'] ?? $_COOKIE['application_covera
 if (PHP_SAPI !== 'fpm-fcgi' || !is_string($token) || !preg_match('/^[a-f0-9]{32}$/D', $token)) {
     return;
 }
+require_once __DIR__ . '/collection.php';
+$collectionLock = coverageCollectionLock(LOCK_SH);
 $active = @file_get_contents('/coverage/.active-run');
 if ($active === false || !hash_equals(trim($active), $token)) {
+    fclose($collectionLock);
     return;
 }
 $record = '/coverage/raw/php/' . $token . '/' . bin2hex(random_bytes(16));
@@ -18,10 +21,12 @@ if (!function_exists('pcov\\export')) {
 }
 $state = json_decode(file_get_contents('/coverage/collector.json'), true, flags: JSON_THROW_ON_ERROR);
 pcov\start();
-register_shutdown_function(static function () use ($record, $token, $state): void {
+// Retain the shared lock until request shutdown. Reporting takes an exclusive
+// lock and closes the run, without terminating or restarting the FPM worker.
+register_shutdown_function(static function () use ($record, $token, $state, $collectionLock): void {
     pcov\stop();
     try {
-        $result = pcov\export($record . '.pcov', $state['manifest'], $state['identity']['id']);
+        $result = pcov\export($record . '.pcov', $state['manifest'], $state['identity']['id'], pcov\inclusive, array_keys($state['scope']));
         if ($result === false) {
             throw new RuntimeException('Native PCOV export failed');
         }

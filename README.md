@@ -19,7 +19,7 @@ Run `./bin/run-coverage` to generate coverage reports and badges for your projec
 Run this inside the empty directory you want to use for MageLens:
 
 ```bash
-wget -qO- https://github.com/VitaliyBoyko/MageLens/archive/refs/tags/v1.0.5.tar.gz | tar -xz --strip-components=1 && ./install.sh
+wget -qO- https://github.com/VitaliyBoyko/MageLens/archive/refs/tags/v1.0.6.tar.gz | tar -xz --strip-components=1 && ./install.sh
 ```
 
 If you have already cloned or downloaded MageLens, run `./install.sh` from its project directory.
@@ -31,6 +31,8 @@ Then generate coverage reports:
 ```bash
 ./bin/run-coverage
 ```
+
+Coverage runs reuse the running environment. Cache cleaning, asset refreshes and restarts are [optional arguments](docs/coverage.md#run-lifecycle); use `--start` if services are stopped.
 
 The installer asks for a test domain, defaulting to `magelens.test`, and saves it as `APPLICATION_DOMAIN` in `.env`. It downloads Magento, dependencies, and the Cypress browser; allow several minutes. To use an existing project, [copy its source before installing](#copy-a-complete-magento-project).
 
@@ -58,7 +60,7 @@ Open the live runner before starting `./bin/run-coverage` to watch the Cypress w
 
 Installation uses Mark Shust's `bin/setup-composer-auth`. It reuses Composer credentials from the container or host, or asks for **Username** (public key) and **Password** (private key). Credentials are stored in the local `composerdata` Docker volume. To configure them separately after the PHP service starts, run `bin/setup-composer-auth`.
 
-Mark Shust's `bin/setup-domain` adds the domain to your hosts file and configures a trusted local HTTPS certificate. Its setup scripts request your system password when needed. The application and live viewer bind to `127.0.0.1`.
+The installer adds the domain to your hosts file and uses Mark Shust's SSL tools to configure a trusted local HTTPS certificate. These steps request your system password when needed. The application and live viewer bind to `127.0.0.1`.
 
 ## Coverage reports
 
@@ -81,6 +83,8 @@ Read the [coverage guide](docs/coverage.md) for report semantics, collection det
 MageLens extends the Compose services from the selected [Mark Shust Docker Magento](https://github.com/markshust/docker-magento) release with local mounts and coverage tooling. That release selects PHP, nginx, MariaDB, OpenSearch, and the cache service together. A separate image supplies the Cypress runner.
 
 Magento is installed through Composer. Its modules, framework, and themes live in `src/vendor/magento/`; client modules live in `src/app/code/`. Magento runs in developer mode, generating code and static assets on demand, with page and block caches disabled for coverage collection.
+
+The coverage configuration is explicit in [docker/php/env.php.sample](docker/php/env.php.sample). Installation merges this fragment into `src/app/etc/env.php`, preserving credentials and unrelated settings. HTML/PHTML and browser assets run without minification.
 
 Following Mark Shust's development setup, MageLens installs [DisableTwoFactorAuth](https://github.com/markshust/magento2-module-disabletwofactorauth) as a Composer development dependency and turns off Admin 2FA for this local environment. Cypress can sign in with the Admin username and password.
 
@@ -160,7 +164,7 @@ The default Docker project name is `magelens`. To run multiple copies, set a uni
 
 Rerun `./install.sh` to resume interrupted setup or rebuild after Dockerfile changes. Existing database contents, configuration, and media are preserved.
 
-Wait for coverage to finish before browsing manually: the run temporarily uses Docker's internal URL and instrumented source copies. See the [coverage guide](docs/coverage.md#run-lifecycle) for cleanup and recovery.
+Avoid changing application data while the tests run. See the [coverage guide](docs/coverage.md#run-lifecycle) for optional refreshes and recovery.
 
 `./bin/application-compose down -v` deletes this project's Docker volumes, including its database and stored Composer credentials. Source files remain in `src/`. For a fresh database, back up wanted data, run that command, remove `src/app/etc/env.php`, and rerun `./install.sh`.
 

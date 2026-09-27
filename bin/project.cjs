@@ -52,15 +52,17 @@ function files(root) {
 
 function writeRuntime(project, mountRoots = project.roots) {
     fs.mkdirSync('.runtime', {recursive: true});
-    fs.writeFileSync('.runtime/project.json', JSON.stringify(project, null, 2));
+    writeChanged('.runtime/project.json', JSON.stringify(project, null, 2));
     const escape = value => value.replace(/[.*+?^${}()|[\]\\~]/g, '\\$&');
-    const allowed = project.roots.map(root => escape(`/var/www/html/${root}/`)).join('|') || '(?!)';
-    fs.writeFileSync('.runtime/coverage.ini', `pcov.directory=/var/www/html/app\npcov.exclude="~^(?!(?:${allowed}))~"\n`);
+    // Keep PHP's startup filter stable. Each request exports only the selected
+    // files, so changing themes does not require restarting PHP-FPM.
+    const allowed = mountRoots.map(root => escape(`/var/www/html/${root}/`)).join('|') || '(?!)';
+    writeChanged('.runtime/coverage.ini', `pcov.directory=/var/www/html/app\npcov.exclude="~^(?!(?:${allowed}))~"\n`);
     const mount = (source, target) => ({type: 'bind', source, target, read_only: true});
     const sources = mountRoots.map(root => mount(`./.runtime/${root}`, `/var/www/html/${root}`));
     // Magento publishes static assets as symlinks in developer mode. Nginx must
     // resolve those links to the same copies PHP used for the first response.
-    fs.writeFileSync('.runtime/compose.sources.json', JSON.stringify({services: {
+    writeChanged('.runtime/compose.sources.json', JSON.stringify({services: {
         app: {volumes: sources},
         phpfpm: {volumes: [...sources,
             mount('./.runtime/project.json', '/application/project.json'),
@@ -69,4 +71,21 @@ function writeRuntime(project, mountRoots = project.roots) {
     }}, null, 2));
 }
 
-module.exports = {discover, files, writeRuntime, specPatterns, withThemeRoots};
+function writeChanged(file, content) {
+    if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== content) {
+        // These files can be bind-mounted: retain their inodes.
+        fs.writeFileSync(file, content);
+    }
+}
+
+function nginxConfig(template, environment = process.env) {
+    const defaults = {APPLICATION_PORT: '80', APPLICATION_HTTPS_PORT: '443', CYPRESS_VIEW_PORT: '6080'};
+    const ports = Object.entries(defaults).map(([key, fallback]) => [key, environment[key] || fallback]);
+    for (const [key, value] of ports) {
+        if (!/^[0-9]+$/.test(value) || Number(value) < 1 || Number(value) > 65535) throw new Error(`Invalid ${key}`);
+    }
+    if (new Set(ports.map(([, value]) => Number(value))).size !== ports.length) throw new Error('Application and viewer ports must be different');
+    return ports.reduce((config, [key, value]) => config.replaceAll(`__${key}__`, String(Number(value))), template);
+}
+
+module.exports = {discover, files, writeRuntime, writeChanged, nginxConfig, specPatterns, withThemeRoots};

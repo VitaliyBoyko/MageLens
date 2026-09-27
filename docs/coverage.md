@@ -15,9 +15,22 @@ Coverage runs use disposable source copies and verify that your originals remain
 
 ## Run lifecycle
 
-Each run replaces previous reports, prepares fresh source copies, and refreshes static assets before starting Cypress. Run installation and coverage commands one at a time.
+Each run replaces previous reports and starts fresh execution counters. Unchanged browser instrumentation is reused; source edits update the disposable runtime copies. Run installation and coverage commands one at a time.
 
-The suite temporarily uses Docker's internal `http://app:8000/` URL. Cleanup restores HTTPS on your selected domain and plain source copies, then clears instrumented static assets, including after test failures. Wait for the command to finish before browsing the application manually.
+The default command uses the running services and the configured HTTPS domain. It does not restart services, change Magento configuration, or clear caches and static assets. Avoid changing application data while the tests run.
+
+Optional refreshes can be combined:
+
+| Option | Use when |
+| --- | --- |
+| `--start` | Application services are stopped |
+| `--refresh-cache` | Layout or configuration changes need a cache clean |
+| `--refresh-assets` | Static assets need rebuilding, for example after adding a theme override or moving a file; also cleans caches |
+| `--restart-php` | PHP-FPM needs restarting |
+
+For example: `./bin/run-coverage --start --refresh-assets`.
+
+Installation merges [docker/php/env.php.sample](../docker/php/env.php.sample) into `src/app/etc/env.php`, preserving credentials, theme selections and unrelated settings. The fragment enables developer mode, disables full-page/block output caching and HTML/PHTML, JavaScript and CSS minification, and sets local URLs and Admin defaults. These settings also apply at website and store scope. HTML assets pass through unchanged; PHTML executes directly. CSS/LESS compilation remains available for themes. Edit the fragment and rerun installation to change these defaults.
 
 The combined report and badges are published after all tests pass and the coverage records and source checks succeed. Skipped or pending tests prevent publication. The README badge section is marked pending when collection starts.
 
@@ -27,7 +40,7 @@ If a process is forcibly terminated, check for active installation or coverage p
 
 Open `https://magelens.test:6080/`, then start `./bin/run-coverage` in your terminal. The viewer shows the Cypress browser as tests execute. Between runs, it displays a waiting screen. Viewing is read-only, so watching a run does not send mouse or keyboard input to the tests.
 
-Use your configured `APPLICATION_DOMAIN` and `CYPRESS_VIEW_PORT` if they differ from the defaults. The viewer starts with the environment and is also started automatically by the coverage command.
+Use your configured `APPLICATION_DOMAIN` and `CYPRESS_VIEW_PORT` if they differ from the defaults. The viewer starts with the environment; use `--start` if it is stopped.
 
 ## PHP coverage
 
@@ -55,15 +68,15 @@ The template badge measures **executable template lines**: starting lines of bin
 
 Follow the [source setup instructions](../README.md#work-with-the-source), then add Cypress scenarios in `cypress/e2e/**/*.cy.js` or a module's `Test/Cypress/**/*.cy.js`. All matching scenarios run with `./bin/run-coverage`.
 
-Rerun `./install.sh` after adding modules, changing setup code or themes, or updating dependencies. Each coverage run refreshes its source copies and scope automatically.
+Rerun `./install.sh` after adding modules or themes, changing setup code, or updating dependencies. Selecting another installed theme updates the next run's scope automatically.
 
 Modules can provide optional fixture hooks in `Test/MageLens/hooks.php`:
 
 | Action | When it runs | Expected output |
 | --- | --- | --- |
-| `before` | Before application startup, with PHP-FPM stopped | Optional diagnostic output |
-| `prepare` | After the application is ready, before Cypress | One JSON value on stdout; diagnostics on stderr |
-| `cleanup` | Before preparation and when the run exits | Optional diagnostic output; safe to repeat |
+| `before` | Before fixture preparation, with services running | Optional diagnostic output |
+| `prepare` | Before Cypress | One JSON value on stdout; diagnostics on stderr |
+| `cleanup` | When the run exits; also before preparation if a previous run was interrupted | Optional diagnostic output; safe to repeat |
 
 Cypress receives each module's `prepare` result through `Cypress.expose('projectFixtures')[moduleName]`. The [blog hooks](../src/app/code/Application/Blog/Test/MageLens/hooks.php) provide an example of fixture creation and cleanup.
 

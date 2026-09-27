@@ -35,19 +35,9 @@ if [[ -n "$modules" ]]; then
 fi
 as_app php bin/magento module:enable MarkShust_DisableTwoFactorAuth
 as_app php bin/magento setup:upgrade
-current_mode=$(as_app php -r '$env = require "app/etc/env.php"; echo $env["MAGE_MODE"] ?? "";')
-if [[ "$current_mode" != developer ]]; then
-    as_app php bin/magento deploy:mode:set developer
-fi
-as_app php bin/magento config:set twofactorauth/general/enable 0
+as_app php /application/docker/php/configure-env.php
+as_app php bin/magento app:config:import --no-interaction
+as_app php bin/magento cache:clean config
 as_app php /application/docker/php/configure-theme.php
-as_app bash /application/docker/php/base-url.sh
-as_app php bin/magento config:set web/url/redirect_to_base 0
-as_app php bin/magento config:set dev/static/sign 0
-as_app php bin/magento config:set dev/js/minify_files 0
-as_app php bin/magento config:set dev/js/merge_files 0
-as_app php bin/magento config:set dev/js/enable_js_bundling 0
-as_app php bin/magento config:set admin/usage/enabled 0
 as_app php /application/docker/php/configure-admin.php
-as_app php bin/magento cache:disable full_page block_html
 as_app php bin/magento indexer:reindex

@@ -44,6 +44,6 @@ writeIndex({run, generatedAt, metrics, php, js, templates, tests});
 setBadgeSection(`[![Cypress: ${tests.totalPassed}/${tests.totalTests} passed](coverage/badges/cypress.svg)](coverage/index.html)\n` + Object.entries(metrics).map(([type, metric]) =>
     `[![${metric.label}: ${metric.percent.toFixed(2)}%](coverage/badges/${type}.svg)](coverage/${type}/index.html)`
 ).join('\n') + `\n\nFull Cypress run: \`${run.id}\` · ${generatedAt}`);
-fs.unlinkSync('coverage/.active-run');
+fs.rmSync('coverage/.active-run', {force: true});
 console.log('Verified all reports, current HTTP collection and unchanged original sources.');
 console.log(JSON.stringify(metrics, null, 2));

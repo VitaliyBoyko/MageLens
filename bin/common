@@ -5,15 +5,17 @@ cd "$ROOT"
 source "$ROOT/bin/dependencies"
 load_dependencies "$ROOT/dependencies.yaml"
 export LOCAL_UID=$(id -u) LOCAL_GID=$(id -g)
+APPLICATION_PHP_IMAGE=''
 dc() {
-    local php_image
     # Read the selected release's PHP image before overriding that service with
     # our PCOV build. All other service images are inherited directly by Compose.
-    php_image=$(docker compose --project-directory "$ROOT/.runtime/docker-magento/compose" \
-        -f "$ROOT/.runtime/docker-magento/compose/compose.yaml" config --images phpfpm) || return
+    if [[ -z "${APPLICATION_PHP_IMAGE:-}" ]]; then
+        APPLICATION_PHP_IMAGE=$(docker compose --project-directory "$ROOT/.runtime/docker-magento/compose" \
+            -f "$ROOT/.runtime/docker-magento/compose/compose.yaml" config --images phpfpm) || return
+    fi
     local sources=()
     [[ ! -f "$ROOT/.runtime/compose.sources.json" ]] || sources=(-f "$ROOT/.runtime/compose.sources.json")
-    MAGELENS_PHP_IMAGE="$php_image" docker compose --project-directory "$ROOT" -f "$ROOT/compose.yaml" "${sources[@]}" "$@"
+    MAGELENS_PHP_IMAGE="$APPLICATION_PHP_IMAGE" docker compose --project-directory "$ROOT" -f "$ROOT/compose.yaml" "${sources[@]}" "$@"
 }
 say() { printf '\n==> %s\n' "$*"; }
 fail() { printf '\nError: %s\n' "$*" >&2; exit 1; }

@@ -5,9 +5,16 @@ services:
       file: .runtime/docker-magento/compose/compose.yaml
       service: app
     ports: !override
-      - "127.0.0.1:${APPLICATION_PORT:-80}:8000"
-      - "127.0.0.1:${APPLICATION_HTTPS_PORT:-443}:8443"
-      - "127.0.0.1:${CYPRESS_VIEW_PORT:-6080}:8444"
+      - "127.0.0.1:${APPLICATION_PORT:-80}:${APPLICATION_PORT:-80}"
+      - "127.0.0.1:${APPLICATION_HTTPS_PORT:-443}:${APPLICATION_HTTPS_PORT:-443}"
+      - "127.0.0.1:${CYPRESS_VIEW_PORT:-6080}:${CYPRESS_VIEW_PORT:-6080}"
+    networks:
+      default:
+        aliases: ["${APPLICATION_DOMAIN:-magelens.test}"]
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 0
+    environment:
+      APPLICATION_HTTPS_PORT: ${APPLICATION_HTTPS_PORT:-443}
     # Upstream SSL tools create their temporary certificate files here.
     working_dir: /tmp
     volumes: !override
@@ -17,7 +24,7 @@ services:
         source: sockdata
         target: /sock
         volume: {nocopy: true}
-      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./.runtime/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ssldata:/etc/nginx/certs
     depends_on: [phpfpm]
   phpfpm:
@@ -120,7 +127,11 @@ services:
     environment:
       HOME: /tmp
       CYPRESS_CACHE_FOLDER: /opt/cypress
-      CYPRESS_BASE_URL: http://app:8000
+      CYPRESS_BASE_URL: "https://${APPLICATION_DOMAIN:-magelens.test}:${APPLICATION_HTTPS_PORT:-443}"
+      APPLICATION_DOMAIN: ${APPLICATION_DOMAIN:-magelens.test}
+      APPLICATION_PORT: ${APPLICATION_PORT:-80}
+      APPLICATION_HTTPS_PORT: ${APPLICATION_HTTPS_PORT:-443}
+      CYPRESS_VIEW_PORT: ${CYPRESS_VIEW_PORT:-6080}
     volumes:
       - .:/workspace
       - ./src:/source:ro
