@@ -17,6 +17,12 @@ Coverage runs use disposable source copies and verify that your originals remain
 
 Each run replaces previous reports and starts fresh execution counters. Unchanged browser instrumentation is reused; source edits update the disposable runtime copies. Run installation and coverage commands one at a time.
 
+After instrumentation, compatibility patches and fixture preparation, the command warms the storefront homepage in a separate Cypress browser. This prepares shared [static assets generated on demand in developer mode](https://experienceleague.adobe.com/en/docs/commerce-operations/configuration-guide/cli/static-view/static-view-file-deployment).
+
+Warm-up allows up to three minutes per navigation/readiness check and ten minutes overall, with up to ten seconds to terminate the browser. It waits for Magento initializers, enabled RequireJS modules (including `text!` templates), browser requests and a one-second quiet interval. Coverage collection begins after warm-up succeeds, in a fresh browser session with the existing test timeouts. Warm-up execution contributes no PHP, JavaScript or template hits to the reports.
+
+If preparation fails, the run stops and cleans its fixtures and patches before starting collection or tests. Inspect `coverage/warmup-results.json`, `coverage/warmup-diagnostics.json` and `coverage/warmup-screenshots/`. Normal Cypress failures include unfinished request URLs, their elapsed time, unresolved RequireJS modules and HTTP errors. An overall timeout may terminate Cypress before it writes final diagnostics; the terminal retains the last Cypress error/output.
+
 The default command uses the running services and the configured HTTPS domain. It does not restart services, change Magento configuration, or clear caches and static assets. Avoid changing application data while the tests run.
 
 Optional refreshes can be combined:
@@ -75,7 +81,7 @@ Modules can provide optional fixture hooks in `Test/MageLens/hooks.php`:
 | Action | When it runs | Expected output |
 | --- | --- | --- |
 | `before` | Before fixture preparation, with services running | Optional diagnostic output |
-| `prepare` | Before Cypress | One JSON value on stdout; diagnostics on stderr |
+| `prepare` | Before browser warm-up and coverage collection | One JSON value on stdout; diagnostics on stderr |
 | `cleanup` | When the run exits; also before preparation if a previous run was interrupted | Optional diagnostic output; safe to repeat |
 
 Cypress receives each module's `prepare` result through `Cypress.expose('projectFixtures')[moduleName]`. The [blog hooks](../src/app/code/Application/Blog/Test/MageLens/hooks.php) provide an example of fixture creation and cleanup.

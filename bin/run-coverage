@@ -73,6 +73,17 @@ dc exec -T runner node bin/prepare.cjs --theme-roots .runtime/active-themes.json
 touch .runtime/hooks-active
 dc exec -T phpfpm php /application/docker/php/project-hooks.php before
 dc exec -T phpfpm php /application/docker/php/project-hooks.php prepare > coverage/project-fixtures.json
+say 'Warming the storefront homepage in a separate browser (up to 10 minutes)'
+if dc exec -T runner timeout --signal=TERM --kill-after=10s 600s node bin/run-browser.cjs --warmup; then
+    say 'Browser warm-up completed; starting fresh coverage collection'
+else
+    result=$?
+    if [[ "$result" == 124 || "$result" == 137 ]]; then
+        printf 'Browser warm-up exceeded its 10-minute limit.\n' >&2
+    fi
+    printf 'Warm-up failed. Inspect coverage/warmup-results.json, coverage/warmup-diagnostics.json and coverage/warmup-screenshots/.\n' >&2
+    exit "$result"
+fi
 dc exec -T phpfpm php /application/docker/php/manifest.php
 dc exec -T phpfpm php /application/docker/php/collection.php start
 say "Running the full Cypress suite (preparation: ${SECONDS}s)"

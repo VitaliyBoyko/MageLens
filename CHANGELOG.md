@@ -1,5 +1,13 @@
 # Release notes
 
+## 1.0.8 — 2026-10-06
+
+- `./bin/run-coverage` automatically warms the storefront homepage and its dynamic assets before testing, reducing first-run timeouts after installation or an asset refresh.
+- Warm-up has bounded timeouts and reports unfinished requests and RequireJS modules when preparation fails.
+- Coverage starts afterward in a fresh browser session, with the existing test timeouts and two-command workflow.
+
+When updating from v1.0.7, replace the project files and run `./bin/run-coverage` directly; rerunning the installer is unnecessary.
+
 ## 1.0.7 — 2026-09-27
 
 - Demo tests wait for asynchronous storefront and theme templates to render before checking the page.

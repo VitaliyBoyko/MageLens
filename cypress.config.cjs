@@ -12,7 +12,18 @@ module.exports = defineConfig({
         specPattern: specPatterns(),
         supportFile: 'cypress/support/e2e.js',
         setupNodeEvents(on, config) {
-            require('@cypress/code-coverage/task')(on, config);
+            if (config.expose.warmup) {
+                const fs = require('node:fs');
+                on('task', {
+                    'warmup:diagnostics'(diagnostics) {
+                        fs.writeFileSync('coverage/warmup-diagnostics.json', JSON.stringify(diagnostics, null, 2));
+                        if (diagnostics.failed) console.error('Warm-up diagnostics:', JSON.stringify(diagnostics, null, 2));
+                        return null;
+                    }
+                });
+            } else {
+                require('@cypress/code-coverage/task')(on, config);
+            }
             return config;
         }
     }

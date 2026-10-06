@@ -26,7 +26,8 @@ dc() {
         *project-hooks.php\\ prepare) echo '{}' ;;
         *collection.php\\ start) touch coverage/.active-run ;;
         *collection.php\\ stop|*report.php) rm -f coverage/.active-run ;;
-        *run-browser.cjs) [[ -z "$TEST_FAILURE" ]] || return 23 ;;
+        *run-browser.cjs\\ --warmup) [[ "$TEST_FAILURE" != warmup ]] || return 124 ;;
+        *run-browser.cjs) [[ "$TEST_FAILURE" != cypress ]] || return 23 ;;
     esac
 }
 `);
@@ -46,6 +47,13 @@ test('default run preserves running services, configuration and caches', t => {
     assert.equal((result.calls.match(/project-hooks.php cleanup/g) || []).length, 1);
     assert.match(result.calls, /report.php/);
     assert.match(result.calls, /finalize.cjs/);
+    const ordered = ['prepare.cjs', 'project-hooks.php before', 'project-hooks.php prepare',
+        'timeout --signal=TERM --kill-after=10s 600s node bin/run-browser.cjs --warmup',
+        'manifest.php', 'collection.php start', 'runner node bin/run-browser.cjs\n', 'report.php'];
+    for (const command of ordered) assert.ok(result.calls.includes(command), `Missing command: ${command}`);
+    for (let index = 1; index < ordered.length; index++) {
+        assert.ok(result.calls.indexOf(ordered[index - 1]) < result.calls.indexOf(ordered[index]), `${ordered[index - 1]} must precede ${ordered[index]}`);
+    }
 });
 
 test('refreshes run only when requested', t => {
@@ -66,6 +74,16 @@ test('failed tests close collection and clean fixtures without publishing report
     assert.equal((result.calls.match(/project-hooks.php cleanup/g) || []).length, 2, 'Recover interrupted fixtures and clean current fixtures');
     assert.equal((result.calls.match(/collection.php stop/g) || []).length, 2);
     assert.doesNotMatch(result.calls, /report.php|finalize.cjs/);
+    assert.equal(fs.existsSync(path.join(result.directory, '.runtime/hooks-active')), false);
+});
+
+test('warm-up timeout cleans hooks before collection and does not run tests or reports', t => {
+    const result = workflow(t, [], 'warmup');
+    assert.equal(result.status, 124, result.stderr);
+    assert.match(result.stderr, /exceeded its 10-minute limit/);
+    assert.match(result.stderr, /warmup-diagnostics.json/);
+    assert.equal((result.calls.match(/project-hooks.php cleanup/g) || []).length, 1);
+    assert.doesNotMatch(result.calls, /collection.php start|runner node bin\/run-browser.cjs\n|manifest.php|report.php|finalize.cjs/);
     assert.equal(fs.existsSync(path.join(result.directory, '.runtime/hooks-active')), false);
 });
 
