@@ -144,6 +144,10 @@ if (args.includes('--print-viewer')) console.log('https://shop.magelens.test:608
     assert.ok(volumeSetup.args.includes('run') && volumeSetup.args.includes('--no-deps'));
     assert.ok(calls.indexOf(volumeSetup) < calls.indexOf(phpStart), 'Socket ownership must be set before starting non-root PHP');
     assert.ok(phpStart.args.includes('--wait'), 'Wait for the PHP socket before Composer authentication');
+    assert.ok(phpStart.args.includes('--force-recreate'), 'Reinstall setup must reset unhealthy containers and stale mounts');
+    assert.ok(phpStart.args.includes('--no-deps'), 'Setup must start only PHP-FPM');
+    const stoppedWeb = calls.find(call => call.args.includes('stop') && call.args.includes('app') && call.args.includes('phpfpm'));
+    assert.ok(stoppedWeb && calls.indexOf(stoppedWeb) < calls.indexOf(volumeSetup), 'Stop web traffic and old FPM before volume initialization');
     assert.ok(calls.indexOf(phpStart) < calls.indexOf(auth));
     const download = calls.find(call => call.args.includes('/application/docker/php/download-magento.sh'));
     const expose = calls.find(call => call.args.includes('run') && call.args.includes('workspace'));

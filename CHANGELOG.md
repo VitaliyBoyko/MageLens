@@ -1,5 +1,12 @@
 # Release notes
 
+## 1.0.9 — 2026-10-06
+
+- Reinstalling recreates PHP-FPM before Composer setup, allowing recovery from unhealthy containers and stale source mounts.
+- Installation failures now show Docker health-check results and PHP socket connection errors alongside container logs.
+
+If installation failed at PHP-FPM startup, replace the project files and rerun `./install.sh`. Existing source, Composer credentials and database volumes are retained.
+
 ## 1.0.8 — 2026-10-06
 
 - `./bin/run-coverage` automatically warms the storefront homepage and its dynamic assets before testing, reducing first-run timeouts after installation or an asset refresh.

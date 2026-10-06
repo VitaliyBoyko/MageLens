@@ -27,11 +27,20 @@ start_dependencies() {
     fi
 }
 start_php_for_setup() {
+    # An earlier install may leave a running, unhealthy container or stale source
+    # mounts. Stop web traffic and give setup a fresh FPM process and health state.
+    dc stop -t 60 app phpfpm
     # Fresh named volumes belong to root. Initialize them before non-root PHP starts.
     dc run --rm --no-deps --user root phpfpm chown "$LOCAL_UID:$LOCAL_GID" /sock /var/www/.composer /bootstrap
-    if ! dc up -d --wait --wait-timeout 60 phpfpm; then
-        dc logs --tail 50 phpfpm
-        fail 'PHP-FPM could not start. See the container logs above.'
+    if ! dc up -d --no-deps --force-recreate --wait --wait-timeout 60 phpfpm; then
+        dc ps -a phpfpm >&2 || true
+        dc logs --tail 50 phpfpm >&2 || true
+        local container
+        container=$(dc ps -a -q phpfpm) || container=''
+        if [[ -n "$container" ]]; then
+            docker inspect --format '{{json .State.Health}}' "$container" >&2 || true
+        fi
+        fail 'PHP-FPM could not start. See its health-check results and container logs above.'
     fi
 }
 preflight() {
