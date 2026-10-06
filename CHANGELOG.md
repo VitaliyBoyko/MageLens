@@ -1,5 +1,11 @@
 # Release notes
 
+## 1.0.10 — 2026-10-06
+
+- Homepage warm-up no longer times out because Magento initialization markers remain after assets have finished loading. Unfinished browser requests and RequireJS modules still block preparation and produce diagnostics.
+
+When updating from v1.0.9, replace the project files and run `./bin/run-coverage` directly; rerunning the installer is unnecessary.
+
 ## 1.0.9 — 2026-10-06
 
 - Reinstalling recreates PHP-FPM before Composer setup, allowing recovery from unhealthy containers and stale source mounts.

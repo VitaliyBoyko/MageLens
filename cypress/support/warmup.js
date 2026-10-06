@@ -19,7 +19,7 @@ function snapshot() {
         pendingRequests: [...requests.values()].map(request => ({...request, elapsedMs: Date.now() - request.startedAt})),
         failedRequests,
         pendingModules: modules,
-        pendingInitializers: win?.document.querySelectorAll('[data-mage-init], script[type="text/x-magento-init"]').length,
+        initializerMarkers: win?.document.querySelectorAll('[data-mage-init], script[type="text/x-magento-init"]').length,
         quietForMs: Date.now() - lastActivity
     };
 }
@@ -54,7 +54,8 @@ Cypress.Commands.add('warmupReady', () => {
         win = current;
         const state = snapshot();
         expect(current.document.readyState, 'document loaded').to.equal('complete');
-        expect(state.pendingInitializers, 'Magento initializers processed').to.equal(0);
+        // Declaration markers can remain in dynamically rendered markup. They
+        // describe initialization, rather than counting unfinished async work.
         expect(state.pendingModules, 'RequireJS components and templates resolved').to.deep.equal([]);
         expect(state.pendingRequests, 'browser requests completed').to.deep.equal([]);
         expect(state.quietForMs, 'no new requests for one second').to.be.at.least(1000);

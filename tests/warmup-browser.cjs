@@ -10,7 +10,7 @@ const execute = promisify(execFile);
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'magelens-warmup-'));
 const root = path.resolve(__dirname, '..');
 const requests = [];
-let broken = false;
+let scenario = 'loaded';
 const server = http.createServer((request, response) => {
     requests.push({url: request.url, cookie: request.headers.cookie || ''});
     const send = (body, type = 'text/html') => {
@@ -21,9 +21,10 @@ const server = http.createServer((request, response) => {
     if (request.url === '/late.css') return setTimeout(() => send('body { color: black; }', 'text/css'), 700);
     if (request.url === '/template.html') return setTimeout(() => send('<p data-cy="rendered-template">Loaded article</p>'), 700);
     if (request.url === '/unfinished-template.html') return; // Deliberate unresolved request.
-    if (request.url === '/' && broken) return send(`<html><body><script>
-        window.requirejs = {s: {contexts: {_: {registry: {unfinished: {enabled: true, map: {url: '/unfinished-template.html'}}}}}}};
-        window.addEventListener('load', () => fetch('/unfinished-template.html'));
+    if (request.url === '/' && scenario !== 'loaded') return send(`<html><body data-mage-init="{}"><script>
+        window.requirejs = {s: {contexts: {_: {registry: ${scenario === 'module'
+            ? "{unfinished: {enabled: true, map: {url: '/unfinished-template.html'}}}" : '{}'}}}}};
+        ${scenario === 'request' ? "window.addEventListener('load', () => fetch('/unfinished-template.html'));" : ''}
     </script></body></html>`);
     if (request.url === '/') return send(`<html><body data-mage-init="{}"><script>
         window.requirejs = {s: {contexts: {_: {registry: {late: {enabled: true, map: {url: '/late.js'}}}}}}};
@@ -37,7 +38,7 @@ const server = http.createServer((request, response) => {
                 const template = await fetch('/template.html').then(response => response.text());
                 document.body.insertAdjacentHTML('beforeend', template);
                 delete window.requirejs.s.contexts._.registry.template;
-                document.body.removeAttribute('data-mage-init');
+                // A retained declaration must not block an otherwise idle page.
                 window.localStorage.setItem('warmup-only', 'set');
                 window.sessionStorage.setItem('warmup-only', 'set');
                 document.cookie = 'warmup-only=set; path=/';
@@ -79,6 +80,10 @@ async function browser(warmup, shouldFail = false) {
     write('coverage/run.json', JSON.stringify({id: 'a'.repeat(32)}));
     await browser(true);
     assert.equal(read('coverage/warmup-results.json').totalPassed, 1);
+    const loaded = read('coverage/warmup-diagnostics.json');
+    assert.equal(loaded.initializerMarkers, 1, 'The retained marker regression did not execute');
+    assert.deepEqual(loaded.pendingRequests, []);
+    assert.deepEqual(loaded.pendingModules, []);
     for (const url of ['/late.js', '/late.css', '/template.html']) {
         assert.ok(requests.some(request => request.url === url), `Warm-up missed ${url}`);
     }
@@ -101,18 +106,24 @@ async function browser(warmup, shouldFail = false) {
     await browser(false);
     assert.equal(read('coverage/cypress-results.json').totalPassed, 1);
     assert.ok(requests.filter(request => request.url === '/fresh').every(request => request.cookie.includes('application_coverage=')));
-    console.log('PASS: delayed dynamic assets finish; warm-up produces no coverage; tests start with fresh state and existing timeouts.');
+    console.log('PASS: retained initializer markers do not block loaded assets; warm-up produces no coverage; tests start with fresh state and existing timeouts.');
 
-    broken = true;
     write('cypress/warmup/storefront.cy.js', fs.readFileSync(path.join(root, 'cypress/warmup/storefront.cy.js'), 'utf8')
         .replace("describe('Storefront warm-up',", "describe('Storefront warm-up', {defaultCommandTimeout: 1500},"));
-    await browser(true, true);
-    const diagnostics = read('coverage/warmup-diagnostics.json');
-    assert.equal(diagnostics.failed, true);
-    assert.ok(diagnostics.pendingRequests.some(request => request.url.endsWith('/unfinished-template.html')));
-    assert.ok(diagnostics.pendingModules.some(module => module.id === 'unfinished'));
-    assert.equal(read('coverage/warmup-results.json').totalFailed, 1);
-    console.log('PASS: readiness failures identify unfinished requests and RequireJS modules.');
+    for (scenario of ['module', 'request']) {
+        await browser(true, true);
+        const diagnostics = read('coverage/warmup-diagnostics.json');
+        assert.equal(diagnostics.failed, true);
+        if (scenario === 'module') {
+            assert.ok(diagnostics.pendingModules.some(module => module.id === 'unfinished'));
+            assert.deepEqual(diagnostics.pendingRequests, []);
+        } else {
+            assert.ok(diagnostics.pendingRequests.some(request => request.url.endsWith('/unfinished-template.html')));
+            assert.deepEqual(diagnostics.pendingModules, []);
+        }
+        assert.equal(read('coverage/warmup-results.json').totalFailed, 1);
+    }
+    console.log('PASS: unfinished requests and RequireJS modules independently block readiness and produce diagnostics.');
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => {
     server.closeAllConnections();
     server.close();
