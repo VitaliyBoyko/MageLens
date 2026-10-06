@@ -9,7 +9,7 @@ Coverage includes supported files in:
 - `src/app/code/`
 - The selected frontend and Admin themes under `src/app/design/`, including their local parent themes.
 
-PHP and `.phtml` files appear in the PHP report, `.js` files in the JavaScript report, and `.html` files in the template report. Files within this scope are included regardless of namespace or purpose. Unexecuted files remain uncovered, including setup and test helpers that run only through CLI. Unrelated inactive themes and Composer packages under `src/vendor/` are excluded. Each run resolves the configured themes for active stores and Admin before instrumenting sources, so changing the selected theme updates all three reports.
+PHP and `.phtml` files appear in the PHP report, application `.js` files in the JavaScript report, and `.html` files in the template report. Cypress specs (`*.cy.js`) and JavaScript in `Test/Cypress/` or `cypress/` directories are excluded from instrumentation and JavaScript reports. Unexecuted application files remain uncovered, including PHP setup and test helpers that run only through CLI. Unrelated inactive themes and Composer packages under `src/vendor/` are excluded. Each run resolves the configured themes for active stores and Admin before instrumenting sources, so changing the selected theme updates all three reports.
 
 Coverage runs use disposable source copies and verify that your originals remain unchanged. Symlinked source files and directories are unsupported.
 
@@ -58,7 +58,7 @@ Every run records fresh execution. Cached collection metadata is refreshed autom
 
 ## JavaScript coverage
 
-`istanbul-lib-instrument` adds execution counters to every `.js` file under the source directories. Cypress collects each page's counters through `@cypress/code-coverage`, and nyc generates the reports.
+`istanbul-lib-instrument` adds execution counters to application `.js` files under the source directories, excluding Cypress specs and support directories. Cypress collects each page's counters through `@cypress/code-coverage`, and nyc generates the reports. Cypress records from older instrumentation are also removed before reporting.
 
 Files that are never loaded retain zero-hit counters from instrumentation. The report combines these with execution observed during the current suite.
 

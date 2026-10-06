@@ -59,6 +59,53 @@ test('source edits update runtime files in place without rewriting unchanged bro
     assert.equal(fs.existsSync(script), false);
 });
 
+test('Cypress specs and helpers remain plain while application instrumentation is reused', t => {
+    const {base, write} = fixture(t);
+    const sources = [
+        `src/${base}/Test/Cypress/example.cy.js`,
+        `src/${base}/Test/Cypress/support.js`,
+        `src/${base}/Test/Cypress/helpers/navigation.js`,
+        `src/${base}/Test/example.cy.js`,
+        `src/${base}/cypress/support/commands.js`
+    ];
+    for (const file of sources) write(file, 'window.testHelper = true;');
+    prepare({themeRoots: []});
+    const script = `.runtime/${base}/view/frontend/web/js/example.js`;
+    const original = fs.statSync(script, {bigint: true}).mtimeNs;
+    const baseline = read('.runtime/js-baseline.json');
+    assert.deepEqual(Object.keys(baseline), [path.resolve(`src/${base}/view/frontend/web/js/example.js`)]);
+    for (const file of sources) {
+        assert.equal(fs.readFileSync(path.join('.runtime', path.relative('src', file)), 'utf8'), fs.readFileSync(file, 'utf8'));
+        assert.ok(file in read('coverage/run.json').sources, 'Excluded test code still participates in source integrity checks');
+        assert.ok(!(file in read('.runtime/instrumentation.json').outputs));
+    }
+    write(sources[1], 'window.testHelper = false;');
+    prepare({themeRoots: []});
+    assert.equal(fs.readFileSync(`.runtime/${base}/Test/Cypress/support.js`, 'utf8'), 'window.testHelper = false;');
+    assert.equal(fs.statSync(script, {bigint: true}).mtimeNs, original);
+});
+
+test('preparing after an older release removes instrumented Cypress copies and baseline entries', t => {
+    const {base, write} = fixture(t);
+    const source = `src/${base}/Test/Cypress/support.js`;
+    const original = 'window.testHelper = true;';
+    write(source, original);
+    prepare({runtimeOnly: true, themeRoots: []});
+    const {createInstrumenter} = require('istanbul-lib-instrument');
+    const instrumenter = createInstrumenter();
+    fs.writeFileSync(`.runtime/${base}/Test/Cypress/support.js`, instrumenter.instrumentSync(original, path.resolve(source)));
+    const baseline = read('.runtime/js-baseline.json');
+    baseline[path.resolve(source)] = instrumenter.lastFileCoverage();
+    fs.writeFileSync('.runtime/js-baseline.json', JSON.stringify(baseline));
+    const cache = read('.runtime/instrumentation.json');
+    cache.signature = 'older-release';
+    fs.writeFileSync('.runtime/instrumentation.json', JSON.stringify(cache));
+    prepare({themeRoots: []});
+    assert.equal(fs.readFileSync(`.runtime/${base}/Test/Cypress/support.js`, 'utf8'), original);
+    assert.equal(fs.readFileSync(source, 'utf8'), original);
+    assert.ok(!(path.resolve(source) in read('.runtime/js-baseline.json')));
+});
+
 test('theme changes replace the report scope without changing PHP startup filters', t => {
     const {write} = fixture(t);
     const themes = ['app/design/frontend/Acme/one', 'app/design/frontend/Acme/two'];

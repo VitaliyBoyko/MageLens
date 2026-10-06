@@ -1,9 +1,13 @@
 const fs = require('node:fs');
 const {execFileSync} = require('node:child_process');
 const {createCoverageMap} = require('istanbul-lib-coverage');
+const {isCypressJavaScript} = require('./project.cjs');
 const raw = fs.existsSync('.nyc_output/out.json') ? JSON.parse(fs.readFileSync('.nyc_output/out.json')) : {};
 const actual = createCoverageMap(raw);
 const baseline = createCoverageMap(JSON.parse(fs.readFileSync('.runtime/js-baseline.json')));
+// Also discard Cypress records left by older instrumentation or coverage plugins.
+actual.filter(file => !isCypressJavaScript(file));
+baseline.filter(file => !isCypressJavaScript(file));
 // Zero counters captured DURING instrumentation include JS never loaded by a test.
 // Merging these cannot invent a hit, including when no scoped script was loaded.
 for (const file of actual.files()) {

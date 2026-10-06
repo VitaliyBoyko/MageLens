@@ -19,7 +19,7 @@ Run `./bin/run-coverage` to generate coverage reports and badges for your projec
 Run this inside the empty directory you want to use for MageLens:
 
 ```bash
-wget -qO- https://github.com/VitaliyBoyko/MageLens/archive/refs/tags/v1.0.10.tar.gz | tar -xz --strip-components=1 && ./install.sh
+wget -qO- https://github.com/VitaliyBoyko/MageLens/archive/refs/tags/v1.0.11.tar.gz | tar -xz --strip-components=1 && ./install.sh
 ```
 
 If you have already cloned or downloaded MageLens, run `./install.sh` from its project directory.
@@ -74,7 +74,7 @@ The installer adds the domain to your hosts file and uses Mark Shust's SSL tools
 
 Open `coverage/index.html` directly in your browser for the combined view. Each successful full run also refreshes the four SVG badges in `coverage/badges/` and the managed badge section in this README. Reports are generated locally and are ignored by Git; the badges can be committed. Archive `coverage/` to share the browsable reports.
 
-Coverage includes every PHP/`.phtml`, JavaScript `.js`, and HTML template file under `src/app/code/`, plus selected storefront and Admin themes and their local parents under `src/app/design/`. The theme scope is resolved from Magento on each run; inactive themes and `vendor/` are excluded. Unexecuted files within that scope remain uncovered, including setup and test helpers that run only through CLI.
+Coverage includes PHP/`.phtml`, application JavaScript `.js`, and HTML template files under `src/app/code/`, plus selected storefront and Admin themes and their local parents under `src/app/design/`. Cypress specs (`*.cy.js`) and JavaScript in `Test/Cypress/` or `cypress/` directories are excluded from the JavaScript report. The theme scope is resolved from Magento on each run; inactive themes and `vendor/` are excluded. Unexecuted application files remain uncovered, including PHP setup and test helpers that run only through CLI.
 
 Read the [coverage guide](docs/coverage.md) for report semantics, collection details, and adding tests and fixtures.
 

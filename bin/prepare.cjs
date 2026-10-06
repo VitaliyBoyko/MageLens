@@ -2,9 +2,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {createHash, randomBytes} = require('node:crypto');
 const {setBadgeSection} = require('./badges.cjs');
-const {discover, files, writeRuntime, writeChanged, nginxConfig, withThemeRoots} = require('./project.cjs');
+const {discover, files, writeRuntime, writeChanged, nginxConfig, withThemeRoots, isCypressJavaScript} = require('./project.cjs');
 const digest = value => createHash('sha256').update(value).digest('hex');
-const browserFile = file => /\.(js|html)$/.test(file);
+const browserFile = file => /\.(js|html)$/.test(file) && !isCypressJavaScript(file);
 
 function applicationFiles(roots = discover().roots) {
     return roots.flatMap(root => files(`src/${root}`));

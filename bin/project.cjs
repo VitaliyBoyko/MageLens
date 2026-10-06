@@ -31,6 +31,12 @@ function specPatterns() {
     return ['cypress/e2e/**/*.cy.js', ...discover().modules.map(module => `src/${module.root}/Test/Cypress/**/*.cy.js`)];
 }
 
+function isCypressJavaScript(file) {
+    const normalized = file.replaceAll('\\', '/');
+    return normalized.endsWith('.js') && (normalized.endsWith('.cy.js')
+        || /(?:^|\/)(?:Test\/Cypress|cypress)\//.test(normalized));
+}
+
 function withThemeRoots(project, themeRoots, source = 'src') {
     if (!Array.isArray(themeRoots)) throw new Error('Expected selected theme directories');
     for (const root of themeRoots) {
@@ -88,4 +94,4 @@ function nginxConfig(template, environment = process.env) {
     return ports.reduce((config, [key, value]) => config.replaceAll(`__${key}__`, String(Number(value))), template);
 }
 
-module.exports = {discover, files, writeRuntime, writeChanged, nginxConfig, specPatterns, withThemeRoots};
+module.exports = {discover, files, writeRuntime, writeChanged, nginxConfig, specPatterns, withThemeRoots, isCypressJavaScript};

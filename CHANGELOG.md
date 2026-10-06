@@ -1,5 +1,12 @@
 # Release notes
 
+## 1.0.11 — 2026-10-06
+
+- JavaScript coverage excludes Cypress specs and support directories from instrumentation and report totals, including stale records from older releases.
+- Unvisited application JavaScript still contributes zero-hit coverage, and source integrity checks still include test files.
+
+When updating from v1.0.10, replace the project files and run `./bin/run-coverage` directly; rerunning the installer is unnecessary. The next run rebuilds instrumentation automatically.
+
 ## 1.0.10 — 2026-10-06
 
 - Homepage warm-up no longer times out because Magento initialization markers remain after assets have finished loading. Unfinished browser requests and RequireJS modules still block preparation and produce diagnostics.

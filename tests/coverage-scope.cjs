@@ -14,7 +14,7 @@ if (process.argv[2] === 'browser') {
     fs.writeFileSync('.nyc_output/out.json', JSON.stringify(context.window.__coverage__));
     execFileSync('node', ['bin/report-browser.cjs'], {stdio: 'inherit'});
     const js = JSON.parse(fs.readFileSync('coverage/js/coverage-summary.json'));
-    for (const file of ['app/code/root.js', 'app/code/Magento/Local/Test/example.cy.js',
+    for (const file of ['app/code/root.js',
         'app/code/Magento/Local/view/frontend/requirejs-config.js', 'app/design/frontend/Magento/local/web/js/theme.js']) {
         const metric = js[`/workspace/src/${file}`];
         assert.ok(metric && metric.lines.total > 0, `Missing JavaScript: ${file}`);
@@ -22,12 +22,13 @@ if (process.argv[2] === 'browser') {
     }
     assert.ok(!Object.keys(js).some(file => file.includes('/vendor/')));
     assert.ok(!Object.keys(js).some(file => file.includes('/inactive/')));
+    assert.ok(!Object.keys(js).some(file => file.endsWith('.cy.js') || file.includes('/Test/Cypress/')));
     const templates = JSON.parse(fs.readFileSync('coverage/templates/coverage-summary.json')).templates;
     assert.ok(templates.some(file => file.path === 'app/code/Magento/Local/view/frontend/web/template/example.html'));
     assert.ok(templates.some(file => file.path === 'app/design/frontend/Magento/local/web/template/example.html'));
     assert.ok(!templates.some(file => file.path.includes('vendor/')));
     assert.ok(!templates.some(file => file.path.includes('/inactive/')));
-    console.log('PASS: Magento namespace, JS outside web/js, tests, and unvisited templates reach browser reports.');
+    console.log('PASS: application JavaScript and unvisited templates reach browser reports; Cypress code is excluded.');
     process.exit(0);
 }
 
@@ -47,6 +48,7 @@ try {
         put(`src/${file}`, '<?php $scopeExample = 42;\n');
     }
     for (const file of ['app/code/root.js', 'app/code/Magento/Local/Test/example.cy.js',
+        'app/code/Magento/Local/Test/Cypress/support.js',
         'app/code/Magento/Local/view/frontend/requirejs-config.js', 'app/design/frontend/Magento/local/web/js/theme.js',
         'app/design/frontend/Magento/inactive/web/js/theme.js', 'vendor/magento/example/vendor.js']) put(`src/${file}`, 'var config = {example: true};\n');
     for (const file of ['app/code/Magento/Local/view/frontend/web/template/example.html',

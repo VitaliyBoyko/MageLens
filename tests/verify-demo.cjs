@@ -17,6 +17,7 @@ if (php.collection === 'manifest') {
     assert.ok(php.cache.hit > 0, 'The repeated GETs did not show native export cache reuse');
 }
 assert.ok(js.total.lines.covered > 0 && js.total.lines.covered < js.total.lines.total);
+assert.ok(!Object.keys(js).some(file => file.endsWith('.cy.js') || file.includes('/Test/Cypress/')), 'Cypress code must not contribute to application coverage');
 for (const suffix of ['view/frontend/web/js/blog.js', 'view/adminhtml/web/js/editor.js', 'view/adminhtml/web/js/confirm-delete.js']) {
     const file = Object.keys(js).find(file => file.endsWith('/Application/Blog/' + suffix));
     assert.ok(file && js[file].lines.covered > 0, `Missing browser execution: ${suffix}`);
