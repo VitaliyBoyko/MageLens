@@ -7,7 +7,7 @@ MARKSHUST_DOCKER_MAGENTO_VERSION: "53.1.0"
 PCOV_VERSION: "2.1.2"
 PIE_VERSION: "1.4.10"
 CYPRESS_VERSION: "16.1.0"
-TEMPLATE_COVERAGE_VERSION: "1.1.0"
+TEMPLATE_COVERAGE_VERSION: "1.1.1"
 
 # Node and browser system dependencies for the Cypress runner.
 RUNNER_IMAGE: "cypress/base:24.15.0"

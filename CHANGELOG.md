@@ -1,5 +1,12 @@
 # Release notes
 
+## 1.0.12 — 2026-10-09
+
+- Updated Magento template coverage to 1.1.1 so instrumented Underscore and Magento literal templates render safely while the execution collector is unavailable.
+- Cypress reconnects restore a deleted template execution helper in retained documents.
+
+When updating from v1.0.11, replace the project files and rerun `./install.sh` once to install the updated template coverage dependency, then use `./bin/run-coverage` as usual.
+
 ## 1.0.11 — 2026-10-06
 
 - JavaScript coverage excludes Cypress specs and support directories from instrumentation and report totals, including stale records from older releases.
